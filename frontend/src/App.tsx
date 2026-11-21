@@ -1,15 +1,17 @@
 import { useAuth } from './context/AuthContext';
-import './styles/global.css';
+import { SiteHeader } from './components/SiteHeader';
+import { RainBanner } from './components/RainBanner';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { PublicHomePage } from './pages/PublicHomePage';
+import { ReportDetailPage } from './pages/ReportDetailPage';
 
 function App() {
-  const { usuario, rolActivo, autenticado, cerrarSesion } = useAuth();
+  useAuth();
+  const path = window.location.pathname;
+  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
   return (
-    <main className="contenedor">
-      <header><h1>Calles Seguras Juárez</h1><p>Reporta daños y consulta el estado de las calles de Ciudad Juárez.</p></header>
-      <section aria-labelledby="sesion-titulo"><h2 id="sesion-titulo">Sesión</h2>
-        {autenticado ? <><p>Hola, {usuario?.nombre}. Rol activo: {rolActivo}.</p><button type="button" onClick={() => void cerrarSesion()}>Cerrar sesión</button></> : <p>Consulta reportes públicos o inicia sesión para participar.</p>}
-      </section>
-    </main>
+    <><SiteHeader /><RainBanner />{contenido}<footer className="site-footer"><p>Calles Seguras Juárez · Información pública para una movilidad más segura.</p></footer></>
   )
 }
 
