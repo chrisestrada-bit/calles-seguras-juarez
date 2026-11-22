@@ -6,13 +6,16 @@ import { RegisterPage } from './pages/RegisterPage';
 import { PublicHomePage } from './pages/PublicHomePage';
 import { ReportDetailPage } from './pages/ReportDetailPage';
 import { ReportCreatePage } from './pages/ReportCreatePage';
+import { ZonePage } from './pages/ZonePage';
+import { AdminColoniasPage } from './pages/AdminColoniasPage';
+import { AdminUsuariosPage } from './pages/AdminUsuariosPage';
 import { MyReportsPage } from './pages/MyReportsPage';
 import { AuditPage, CoordinationPage, DashboardPage, ModerationPage } from './pages/AdminPages';
 
 function App() {
   useAuth();
   const path = window.location.pathname;
-  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path === '/reportar' ? <ReportCreatePage /> : path === '/mis-reportes' ? <MyReportsPage /> : path === '/moderacion' ? <ModerationPage /> : path === '/coordinacion' ? <CoordinationPage /> : path === '/dashboard' ? <DashboardPage /> : path === '/auditoria' ? <AuditPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
+  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path === '/reportar' ? <ReportCreatePage /> : path === '/mis-reportes' ? <MyReportsPage /> : path === '/moderacion' ? <ModerationPage /> : path === '/coordinacion' ? <CoordinationPage /> : path === '/admin/colonias' ? <AdminColoniasPage /> : path === '/admin/usuarios' ? <AdminUsuariosPage /> : path === '/mi-zona' ? <ZonePage /> : path === '/dashboard' || path === '/tablero' ? <DashboardPage /> : path === '/auditoria' ? <AuditPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
   return (
     <><SiteHeader /><RainBanner />{contenido}<footer className="site-footer"><p>Calles Seguras Juárez · Información pública para una movilidad más segura.</p></footer></>
   )

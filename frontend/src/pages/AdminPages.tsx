@@ -1,5 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../services/api';
 import type { AuditoriaItem, EstadoReporte, IndicadorSector, IndicadoresResumen, ReporteModeracionDetalle, ReporteModeracionResumen, RespuestaPaginada, TransicionResponse } from '../types/api';
 
@@ -7,14 +6,7 @@ const PAGE_SIZE = 10;
 const formatDate = (value: string) => new Date(value).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
 const makeQuery = (values: Record<string, string | number | undefined>) => Object.entries(values).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${key}=${encodeURIComponent(value as string | number)}`).join('&');
 
-function Guard({ roles, children }: { roles: string[]; children: ReactNode }) {
-  const { autenticado, usuario } = useAuth();
-  if (!autenticado) return <main className="admin-page"><section className="auth-card"><h1>Acceso restringido</h1><p>Inicia sesión para acceder a esta vista administrativa.</p><a className="button" href="/login">Iniciar sesión</a></section></main>;
-  if (!usuario || !roles.includes(usuario.rol)) return <main className="admin-page"><div className="form-error" role="alert">Tu rol no tiene permiso para consultar esta vista.</div><a href="/">Volver a reportes</a></main>;
-  return <>{children}</>;
-}
-function ErrorMessage({ message }: { message: string }) { return <div className="form-error" role="alert">{message}</div>; }
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (value: number) => void }) { return <nav className="pagination" aria-label="Paginación"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)}>Anterior</button><span>Página {page} de {total || 1}</span><button type="button" disabled={page >= total} onClick={() => onChange(page + 1)}>Siguiente</button></nav>; }
+import { Guard, ErrorMessage, Pagination } from '../components/AdminShared';
 
 function TransitionForm({ report, onComplete }: { report: ReporteModeracionResumen; onComplete: (response: TransicionResponse) => void }) {
   const [next, setNext] = useState<EstadoReporte>(report.transiciones_disponibles[0] ?? report.estado); const [reason, setReason] = useState(''); const [scheduled, setScheduled] = useState(''); const [repaired, setRepaired] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');

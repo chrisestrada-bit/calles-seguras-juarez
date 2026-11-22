@@ -116,6 +116,7 @@ class ReporteResumenPublico(BaseModel):
     created_at: FechaLocal
     longevidad_dias: int | None
     vigencia: Vigencia | None
+    nivel_agua: str | None = None
 
 
 class ReportePublico(ReporteResumenPublico):

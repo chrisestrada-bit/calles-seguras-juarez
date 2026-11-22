@@ -30,7 +30,7 @@ export interface ReportePublico {
 export interface ReporteResumenPublico {
   folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad;
   ubicacion: Ubicacion; calle: string; colonia: ReferenciaCatalogo; created_at: string;
-  longevidad_dias: number | null; vigencia: Vigencia | null;
+  longevidad_dias: number | null; vigencia: Vigencia | null; nivel_agua?: string | null;
 }
 export interface HistorialPublico { estado_anterior: EstadoReporte | null; estado_nuevo: EstadoReporte; origen: OrigenHistorial; fecha: string; }
 export interface Paginacion { pagina: number; por_pagina: number; total: number; total_paginas: number; }
