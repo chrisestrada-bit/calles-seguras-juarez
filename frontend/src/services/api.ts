@@ -61,6 +61,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
   const token = obtenerToken();
+  const hayTokenPrevio = Boolean(token);
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   let response: Response;
@@ -76,7 +77,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   const error = await leerError(response);
-  if (response.status === 401) {
+  const esRutaDeAcceso = /\/auth\/(login|registro)(\?|$)/.test(path);
+  if (response.status === 401 && hayTokenPrevio && !esRutaDeAcceso) {
     eliminarToken();
     onUnauthorized?.();
   }

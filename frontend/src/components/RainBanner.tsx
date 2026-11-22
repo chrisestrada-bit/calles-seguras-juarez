@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiError, api } from '../services/api';
+import { api } from '../services/api';
 import type { PronosticoResponse } from '../types/api';
 
 export function RainBanner() {
@@ -10,9 +10,7 @@ export function RainBanner() {
     let activo = true;
     const cargar = async () => {
       try {
-        let respuesta: PronosticoResponse;
-        try { respuesta = await api.get<PronosticoResponse>('/api/v1/clima/lluvia'); }
-        catch (error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; respuesta = await api.get<PronosticoResponse>('/api/v1/clima/pronostico'); }
+        const respuesta = await api.get<PronosticoResponse>('/api/v1/clima/pronostico');
         if (activo) { setPronostico(respuesta); setEstado('listo'); }
       } catch { if (activo) setEstado('error'); }
     };
