@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { api } from '../services/api';
 import { ApiError } from '../services/api';
 import { ReportCard } from './ReportCard';
+import { Icon } from './Icon';
+import { EmptyState, ReportGridSkeleton, tonoDeTipo } from './ui';
 import type { ReporteResumenPublico, RespuestaPaginada } from '../types/api';
 
 const LIMITES = { latMin: 31.45, latMax: 31.8, lngMin: -106.65, lngMax: -106.25 };
@@ -22,11 +24,83 @@ const esIntransitable = (r: ReporteResumenPublico) => r.tipo_dano === 'Encharcam
 const esEncharcamientoActivo = (r: ReporteResumenPublico) => r.tipo_dano === 'Encharcamiento' && r.estado === 'Activo';
 const prioridad = (r: ReporteResumenPublico) => (esIntransitable(r) ? 2 : esEncharcamientoActivo(r) ? 1 : 0);
 
+function Resumen({ zona, origen }: { zona: ReporteResumenPublico[]; origen: string }) {
+  const intransitables = zona.filter(esIntransitable);
+  const activos = zona.filter(esEncharcamientoActivo).length;
+  const pavimento = zona.filter((r) => r.tipo_dano !== 'Encharcamiento').length;
+  return (
+    <>
+      {intransitables.length > 0 && (
+        <div className="zone-alert" role="alert">
+          <span className="zone-alert__icon"><Icon name="ban" size={24} /></span>
+          <div>
+            <strong>{intransitables.length === 1 ? 'Hay 1 calle intransitable' : `Hay ${intransitables.length} calles intransitables`} cerca de {origen}</strong>
+            <p>Evita circular por: {Array.from(new Set(intransitables.map((r) => r.calle))).join(', ')}.</p>
+          </div>
+        </div>
+      )}
+      <dl className="zone-stats" aria-label={`Resumen a 1 km de ${origen}`}>
+        <div className="zone-stat"><dt><Icon name="layers" size={16} />Reportes</dt><dd className="tabular">{zona.length}</dd></div>
+        <div className="zone-stat zone-stat--water"><dt><Icon name="water" size={16} />Encharcamientos activos</dt><dd className="tabular">{activos}</dd></div>
+        <div className={`zone-stat${intransitables.length ? ' zone-stat--critical' : ''}`}><dt><Icon name="ban" size={16} />Intransitables</dt><dd className="tabular">{intransitables.length}</dd></div>
+        <div className="zone-stat zone-stat--road"><dt><Icon name="pothole" size={16} />Baches y alcantarillas</dt><dd className="tabular">{pavimento}</dd></div>
+      </dl>
+    </>
+  );
+}
+
+
+/** Radar de zona: barre mientras consulta y grafica los reportes reales a escala (radio = 1 km). Decorativo para lectores de pantalla: el resumen textual lleva la información. */
+function Radar({ estado, centro, zona }: { estado: 'espera' | 'escaneando' | 'listo'; centro: { lat: number; lng: number } | null; zona: ReporteResumenPublico[] | null }) {
+  const R = 100;
+  const puntos = centro && zona ? zona.map((r) => {
+    const este = (r.ubicacion.longitud - centro.lng) * 111 * Math.cos(centro.lat * Math.PI / 180);
+    const norte = (r.ubicacion.latitud - centro.lat) * 111;
+    return { folio: r.folio, x: 120 + Math.max(-1, Math.min(1, este / RADIO_KM)) * R, y: 120 - Math.max(-1, Math.min(1, norte / RADIO_KM)) * R, tono: tonoDeTipo(r.tipo_dano), critico: esIntransitable(r) };
+  }) : [];
+  return (
+    <div className={`zone-radar zone-radar--${estado}`} aria-hidden="true">
+      <svg viewBox="0 0 240 240" focusable="false">
+        <defs>
+          <radialGradient id="radar-fondo" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#13214a" /><stop offset="1" stopColor="#070d1a" /></radialGradient>
+          <linearGradient id="radar-haz" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#6ea8ff" stopOpacity="0" /><stop offset="1" stopColor="#6ea8ff" stopOpacity="0.5" /></linearGradient>
+        </defs>
+        <circle cx="120" cy="120" r="112" fill="url(#radar-fondo)" />
+        <path d="M120 8v224M8 120h224" className="radar-axis" />
+        <circle cx="120" cy="120" r="100" className="radar-ring radar-ring--edge" />
+        <circle cx="120" cy="120" r="75" className="radar-ring radar-ring--faint" />
+        <circle cx="120" cy="120" r="50" className="radar-ring" />
+        <circle cx="120" cy="120" r="25" className="radar-ring radar-ring--faint" />
+        <text x="124" y="66" className="radar-label">500 m</text>
+        <text x="124" y="16" className="radar-label">1 km</text>
+        <g className="radar-waves">
+          <circle cx="120" cy="120" r="100" className="radar-wave" />
+          <circle cx="120" cy="120" r="100" className="radar-wave" />
+          <circle cx="120" cy="120" r="100" className="radar-wave" />
+        </g>
+        <g className="radar-beam"><path d="M120 120 120 20A100 100 0 0 1 206.6 70Z" fill="url(#radar-haz)" /><path d="M120 120 206.6 70" className="radar-beam-edge" /></g>
+        {puntos.map((p, i) => (
+          <g key={p.folio} className={`radar-blip radar-blip--${p.tono}${p.critico ? ' radar-blip--critical' : ''}`} style={{ ['--i' as string]: i }}>
+            {p.critico && <circle cx={p.x} cy={p.y} r="12" className="radar-blip-ring" />}
+            <circle cx={p.x} cy={p.y} r={p.critico ? 6 : 4.5} className="radar-blip-dot" />
+          </g>
+        ))}
+        <circle cx="120" cy="120" r="9" className="radar-core-halo" />
+        <circle cx="120" cy="120" r="5" className="radar-core" />
+      </svg>
+      <p className="zone-radar__caption">
+        {estado === 'escaneando' ? 'Escaneando 1 km…' : estado === 'listo' && zona ? (zona.length ? `${zona.length} ${zona.length === 1 ? 'reporte' : 'reportes'} en el radio` : 'Sin reportes en el radio') : 'Radio de consulta: 1 km'}
+      </p>
+    </div>
+  );
+}
+
 export function ZoneSection() {
   const [zona, setZona] = useState<ReporteResumenPublico[] | null>(null);
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(false);
   const [origen, setOrigen] = useState('');
+  const [centro, setCentro] = useState<{ lat: number; lng: number } | null>(null);
 
   const consultar = async (lat: number, lng: number, nombre: string) => {
     if (!dentroDeJuarez(lat, lng)) {
@@ -34,7 +108,7 @@ export function ZoneSection() {
       setMensaje('Tu ubicación está fuera de Ciudad Juárez. Elige una ubicación de referencia de la lista para consultar el radio de 1 km.');
       return;
     }
-    setCargando(true); setMensaje(''); setOrigen(nombre);
+    setCargando(true); setMensaje(''); setOrigen(nombre); setCentro({ lat, lng });
     const dLat = RADIO_KM / 111; const dLng = RADIO_KM / (111 * Math.cos(lat * Math.PI / 180));
     try {
       const bbox = `${lng - dLng},${lat - dLat},${lng + dLng},${lat + dLat}`;
@@ -61,15 +135,41 @@ export function ZoneSection() {
 
   return (
     <section className="zone-section" aria-labelledby="zona-titulo">
-      <div><h2 id="zona-titulo">¿Cómo está mi zona?</h2><p>Consulta reportes en un radio de 1 km y revisa primero los encharcamientos activos.</p></div>
-      <button className="button button--secondary" type="button" onClick={usarGps} disabled={cargando}>Usar mi ubicación</button>
-      <fieldset className="zone-references">
-        <legend>O elige una ubicación de referencia en Ciudad Juárez</legend>
-        {REFERENCIAS.map((ref) => <button key={ref.id} className="button button--quiet" type="button" disabled={cargando} onClick={() => void consultar(ref.lat, ref.lng, ref.nombre)}>{ref.nombre}</button>)}
-      </fieldset>
-      {cargando && <p className="state-message" role="status">Consultando reportes cercanos…</p>}
-      {mensaje && !cargando && <p role="status">{mensaje}</p>}
-      {zona && zona.length > 0 && <><p role="status">{zona.length} reporte(s) a 1 km de {origen}.</p><div className="report-grid">{zona.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div></>}
+      <div className="zone-section__layout">
+        <Radar estado={cargando ? 'escaneando' : zona ? 'listo' : 'espera'} centro={centro} zona={zona} />
+        <div className="zone-section__main">
+          <div className="zone-section__intro">
+            <h2 id="zona-titulo">¿Cómo está mi zona?</h2>
+            <p>Consulta reportes en un radio de 1 km y revisa primero los encharcamientos activos.</p>
+          </div>
+          <div className="zone-section__controls">
+            <button className="button button--primary button--lg" type="button" onClick={usarGps} disabled={cargando}><Icon name="locate" size={20} />Usar mi ubicación</button>
+            <fieldset className="zone-references">
+              <legend>O elige una ubicación de referencia en Ciudad Juárez</legend>
+              <div className="pill-group">
+                {REFERENCIAS.map((ref) => (
+                  <button key={ref.id} className="pill" type="button" aria-pressed={origen === ref.nombre && zona !== null} disabled={cargando} onClick={() => void consultar(ref.lat, ref.lng, ref.nombre)}>
+                    <Icon name="pin" size={16} />{ref.nombre}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+        </div>
+      </div>
+
+      <div className="zone-section__results">
+        {cargando && <ReportGridSkeleton count={3} label="Consultando reportes cercanos…" />}
+        {!cargando && zona && zona.length === 0 && <EmptyState art="map" title="Tu zona se ve despejada">{mensaje} Si ves un daño, ayúdanos a registrarlo.</EmptyState>}
+        {!cargando && mensaje && !(zona && zona.length === 0) && <p className="zone-note" role="status"><Icon name="info" size={18} />{mensaje}</p>}
+        {!cargando && zona && zona.length > 0 && (
+          <>
+            <p className="zone-summary" role="status"><span className="tabular">{zona.length}</span> reporte(s) a 1 km de <strong>{origen}</strong>.</p>
+            <Resumen zona={zona} origen={origen} />
+            <div className="report-grid">{zona.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
