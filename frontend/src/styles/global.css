@@ -117,6 +117,24 @@ input, select { min-height: 2.75rem; border: 2px solid #64748b; border-radius: .
 .timeline p { margin: .1rem 0; }
 .timeline time { color: #475569; font-size: .9rem; }
 .site-footer { margin-top: 2rem; padding: 1.5rem 1rem; background: #12304a; color: #fff; text-align: center; }
+.admin-page { max-width: 76rem; margin: 0 auto; padding: 1rem; }
+.admin-intro { padding: 1.5rem 0; }
+.admin-intro h1 { margin: .2rem 0 .6rem; font-size: clamp(2rem, 5vw, 3rem); }
+.admin-action { display: grid; gap: .45rem; min-width: 13rem; }
+.admin-action label { display: grid; gap: .25rem; font-size: .9rem; }
+.admin-action textarea { min-height: 4rem; }
+.admin-table-wrap { overflow-x: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: .75rem; }
+.admin-table { width: 100%; min-width: 850px; border-collapse: collapse; text-align: left; }
+.admin-table th, .admin-table td { padding: .8rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.admin-table thead { background: #e0f2fe; }
+.admin-table small { color: #475569; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.kpi-card { display: grid; gap: .35rem; border: 1px solid #7dd3fc; border-radius: .75rem; background: #fff; padding: 1rem; }
+.kpi-card strong { color: #075985; font-size: 2rem; line-height: 1; }
+.kpi-card small { font-size: .9rem; }
+.metric-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; }
+.metric-list div { background: #f8fafc; border-radius: .4rem; padding: .75rem; }
+.metric-list dd { font-size: 1.4rem; font-weight: 800; margin: .2rem 0 0; }
 @media (min-width: 700px) {
   .site-header__inner { flex-direction: row; align-items: center; flex-wrap: wrap; }
   .site-header nav { flex: 1; }

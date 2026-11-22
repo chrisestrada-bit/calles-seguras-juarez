@@ -86,6 +86,7 @@ export interface IndicadoresResumen { periodo: Periodo; pavimento: { total: numb
 export interface IndicadorSector { sector: ReferenciaCatalogo; baches_abiertos: number; reparados: number; longevidad_promedio_abiertos_dias: number; encharcamientos_total: number; encharcamientos_activos: number; }
 export interface IndicadorLongevidad extends Pick<ReporteResumenPublico, 'folio' | 'tipo_dano' | 'estado' | 'severidad' | 'calle' | 'colonia' | 'created_at' | 'longevidad_dias'> {}
 export interface IndicadoresModeracion { pendientes_validacion: number; antiguedad_max_pendiente_horas: number; tiempo_promedio_validacion_horas: number; rechazados_periodo: number; tasa_rechazo_pct: number; reportes_forzados_como_nuevos: number; encharcamientos_rechazados: number; }
+export interface AuditoriaItem { folio: string; estado_anterior: EstadoReporte | null; estado_nuevo: EstadoReporte; origen: OrigenHistorial; actor_id: string; actor_rol: Rol; motivo: string | null; fecha: string; }
 export interface ClimaActual { temperatura_c: number; precipitacion_mm: number; descripcion: string; }
 export interface PronosticoHora { hora: string; probabilidad_lluvia_pct: number; precipitacion_mm: number; }
 export interface PronosticoResponse { ubicacion: string; actual: ClimaActual; proximas_horas: PronosticoHora[]; alerta_lluvia: boolean; mensaje_alerta: string | null; obtenido_en: string; desactualizado: boolean; }
