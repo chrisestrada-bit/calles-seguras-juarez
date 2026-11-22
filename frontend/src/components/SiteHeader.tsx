@@ -10,10 +10,11 @@ export function SiteHeader() {
         <nav aria-label="Navegación principal">
           <ul className="nav-list">
             <li><a href="/">Reportes públicos</a></li>
+            <li><a href="/mi-zona">Mi zona</a></li>
             {autenticado && <li><a href="/reportar">Reportar daño</a></li>}
             {autenticado && <li><a href="/mis-reportes">Mis reportes</a></li>}
             {(rol === 'moderador' || rol === 'coordinador') && <li><a href="/moderacion">Moderación</a></li>}
-            {rol === 'coordinador' && <><li><a href="/coordinacion">Coordinación</a></li><li><a href="/dashboard">Dashboard</a></li><li><a href="/auditoria">Auditoría</a></li></>}
+            {rol === 'coordinador' && <><li><a href="/coordinacion">Coordinación</a></li><li><a href="/admin/colonias">Colonias</a></li><li><a href="/admin/usuarios">Usuarios</a></li><li><a href="/dashboard">Dashboard</a></li><li><a href="/auditoria">Auditoría</a></li></>}
             {rol === 'moderador' && <li><a href="/dashboard">Dashboard</a></li>}
           </ul>
         </nav>

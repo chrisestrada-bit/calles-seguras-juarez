@@ -123,6 +123,7 @@ def a_resumen(r: Reporte, conteos: Conteos, hoy: date | None = None) -> ReporteR
         created_at=r.created_at,
         longevidad_dias=longevidad_dias(r, hoy),
         vigencia=vigencia_de(r, conteos),
+        nivel_agua=r.nivel_agua.value if r.tipo_dano == TipoDano.ENCHARCAMIENTO and r.nivel_agua else None,
     )
 
 
