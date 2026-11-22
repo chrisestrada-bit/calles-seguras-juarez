@@ -1277,9 +1277,9 @@ No aplica `401`/`403`: es público para que el visitante pueda consultar calles 
 ### 11.3 Garantías de implementación
 
 1. Los esquemas públicos se definen como clases Pydantic **independientes** (no heredan de los modelos internos) con `model_config = ConfigDict(extra="forbid")`, y los routers declaran `response_model=` explícito para que FastAPI filtre cualquier atributo no declarado.
-2. Prueba automatizada (`backend/tests/test_privacidad.py`): recorre todas las rutas públicas con datos semilla y falla si cualquier JSON contiene las llaves `usuario_id`, `autor_id`, `actor_id`, `nombre`, `correo`, `password_hash`, `token_version`, `motivo_rechazo` o algún correo de los usuarios semilla.
+2. Prueba automatizada (`backend/tests/test_api.py::test_respuestas_publicas_sin_datos_personales`): recorre las rutas públicas con datos semilla y falla si algún JSON contiene las llaves `usuario_id`, `autor_id`, `actor_id`, `correo`, `password_hash`, `token_version` o `motivo_rechazo`, o cualquier nombre o correo de los usuarios registrados (`nombre` es llave legítima en los catálogos de sectores y colonias).
 3. Los registros (logs) nunca incluyen correo completo, contraseña ni token.
-4. Prueba automatizada (`backend/tests/test_secretos.py`): con `GEOCODING_API_KEY` configurada con un valor centinela, provoca éxito, *fallback* y errores en `/geocoding/buscar`, y falla si ese valor aparece en algún cuerpo de respuesta, encabezado o línea de log. En el frontend, CI falla si `grep -rE "GEOCODING_API_KEY|locationiq\.com/v1" frontend/dist` encuentra coincidencias (la llave y la URL del proveedor no deben llegar al *bundle*).
+4. Prueba automatizada (`backend/tests/test_api.py::test_geocoding_locationiq_filtra_juarez_y_no_expone_la_llave`): con `GEOCODING_API_KEY` configurada con un valor centinela, provoca éxito y *fallback* en `/geocoding/buscar` y falla si ese valor aparece en algún cuerpo de respuesta o encabezado. En el frontend, CI debe fallar si `grep -rE "GEOCODING_API_KEY|locationiq\.com/v1" frontend/dist` encuentra coincidencias (pendiente: aún no existe el frontend).
 
 ---
 
