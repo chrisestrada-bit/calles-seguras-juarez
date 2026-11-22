@@ -1,12 +1,33 @@
 import type { ReporteResumenPublico } from '../types/api';
+import { Icon } from './Icon';
+import { SeverityBadge, StatusBadge, TypeBadge, antiguedadTexto, tonoDeTipo } from './ui';
 
 export function ReportCard({ reporte }: { reporte: ReporteResumenPublico }) {
   const encharcamiento = reporte.tipo_dano === 'Encharcamiento';
-  return <article className={`report-card ${encharcamiento ? 'report-card--water' : 'report-card--road'}`}>
-    <div className="report-card__title"><span className="damage-icon" aria-hidden="true">{encharcamiento ? '🌊' : '🕳️'}</span><span>{reporte.tipo_dano}</span></div>
-    <p className="report-card__folio"><strong>{reporte.folio}</strong> · {reporte.calle}</p>
-    <p><span className="status-label">Estado:</span> {reporte.etiqueta_publica ?? reporte.estado}</p>
-    {encharcamiento && reporte.vigencia && <p><strong>Confirmaciones:</strong> {reporte.vigencia.sigue_ahi} “sigue ahí” · {reporte.vigencia.ya_no_hay_agua} “ya no hay agua”</p>}
-    <a className="text-link" href={`/reportes/${reporte.folio}`}>Ver detalle e historial <span aria-hidden="true">→</span></a>
-  </article>;
+  const intransitable = encharcamiento && reporte.nivel_agua?.toLowerCase() === 'intransitable';
+  const href = `/reportes/${reporte.folio}`;
+  return (
+    <article className={`report-card report-card--${tonoDeTipo(reporte.tipo_dano)}${intransitable ? ' report-card--critical' : ''}`}>
+      <header className="report-card__top">
+        <TypeBadge tipo={reporte.tipo_dano} />
+        <StatusBadge estado={reporte.estado} etiqueta={reporte.etiqueta_publica} />
+      </header>
+      <div className="report-card__place">
+        <h3 className="report-card__street"><a href={href} className="report-card__link">{reporte.calle}</a></h3>
+        <p className="report-card__colonia"><Icon name="pin" size={16} />{reporte.colonia?.nombre ?? 'Colonia sin registrar'}</p>
+        <p className="report-card__folio">Folio <span className="tabular">{reporte.folio}</span></p>
+      </div>
+      {encharcamiento && reporte.vigencia && (
+        <p className="report-card__votes">
+          <span><Icon name="thumbsUp" size={15} /><span className="tabular">{reporte.vigencia.sigue_ahi}</span> “sigue ahí”</span>
+          <span><Icon name="sun" size={15} /><span className="tabular">{reporte.vigencia.ya_no_hay_agua}</span> “ya no hay agua”</span>
+        </p>
+      )}
+      <footer className="report-card__foot">
+        <SeverityBadge severidad={reporte.severidad} intransitable={intransitable} />
+        <span className="report-card__age"><Icon name="clock" size={15} /><span className="visually-hidden">Antigüedad: </span>{antiguedadTexto(reporte.longevidad_dias, reporte.created_at)}</span>
+        <span className="report-card__cta" aria-hidden="true">Ver detalle <Icon name="arrowRight" size={16} /></span>
+      </footer>
+    </article>
+  );
 }
