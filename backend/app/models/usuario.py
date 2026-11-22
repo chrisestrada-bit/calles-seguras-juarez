@@ -25,5 +25,7 @@ class Usuario(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     intentos_fallidos: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=text("0"))
     bloqueado_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # HU-01.2 / LFPDPPP: momento (UTC) en que aceptó el aviso de privacidad al registrarse.
+    aviso_privacidad_aceptado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

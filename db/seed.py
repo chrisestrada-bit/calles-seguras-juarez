@@ -3,13 +3,18 @@
 Crea usuarios de prueba (ciudadano, moderador, coordinador), sectores y colonias de Ciudad Juárez y un
 volumen realista de reportes históricos y activos distribuidos en distintos estados y colonias.
 
-* Idempotente: usuarios, sectores y colonias se insertan sólo si faltan; los reportes se generan una
-  única vez (si ya existe algún reporte, no se vuelve a sembrar).
+* Idempotente: usuarios, sectores y colonias se insertan sólo si faltan (las colonias existentes sólo
+  actualizan su código postal); los reportes se completan hasta la meta de demostración (≥ 500 visibles,
+  RNF-09) y, una vez alcanzada, no se vuelven a sembrar.
 * Reproducible: el generador aleatorio usa una semilla fija.
 * Pasa por los mismos triggers que la aplicación: el historial de estados y los folios (RN-03) los
   genera la base de datos, y las transiciones respetan RN-05 y RN-06.
-* La contraseña de las cuentas de prueba sale de SEED_PASSWORD (ver .env.example).
-* Las coordenadas y códigos postales de las colonias son aproximados (datos de demostración).
+* La contraseña de las cuentas de prueba sale de SEED_PASSWORD (ver .env.example); no hay valor por
+  omisión en el código. Sin SEED_PASSWORD las cuentas nuevas reciben una contraseña aleatoria no revelada.
+* Colonias y fraccionamientos reales de Ciudad Juárez agrupados por sector. Los códigos postales
+  (32000–32730) provienen del catálogo de SEPOMEX (consultado en micodigopostal.org, 2026-11-22); las
+  coordenadas del centro son aproximadas. Samalayuca (32730) y San Isidro Río Grande (32720) quedan fuera
+  del recuadro de RN-01 y no se incluyen.
 
 Uso:  python db/seed.py
 """
@@ -17,6 +22,7 @@ Uso:  python db/seed.py
 import logging
 import os
 import random
+import secrets
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from sqlalchemy import func, select  # noqa: E402
 
 from app.core.database import SessionLocal  # noqa: E402
-from app.core.security import hashear_contrasena  # noqa: E402
+from app.core.security import MENSAJE_CONTRASENA, contrasena_valida, hashear_contrasena  # noqa: E402
 from app.core.tiempo import a_local, ahora_utc  # noqa: E402
 from app.models import (  # noqa: E402
     CarrilAfectado,
@@ -55,7 +61,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s seed: %(message)s")
 log = logging.getLogger("seed")
 
 SEMILLA_ALEATORIA = 20261121
-CONTRASENA_POR_OMISION = "Juarez2026"  # sólo cuentas de prueba locales; cámbiala con SEED_PASSWORD
 
 SECTORES = [
     ("NORPONIENTE", "Norponiente"),
@@ -66,54 +71,146 @@ SECTORES = [
     ("SURPONIENTE", "Surponiente"),
 ]
 
-# (clave de sector, nombre, código postal aproximado, latitud, longitud)
+# Catálogo territorial agrupado por sector: (nombre, código postal o None, latitud, longitud del centro).
+# Las 46 colonias originales conservan su sector y coordenadas (los reportes ya sembrados apuntan a ellas);
+# se corrigen sus códigos postales cuando SEPOMEX los confirma. None = código postal sin verificar.
+COLONIAS_POR_SECTOR: dict[str, list[tuple[str, str | None, float, float]]] = {
+    "CENTRO": [
+        ("Centro", "32000", 31.7390, -106.4870),
+        ("Cuauhtémoc", "32010", 31.7350, -106.4930),
+        ("Monumento", "32020", 31.7280, -106.4700),
+        ("Partido Romero", "32030", 31.7330, -106.4630),
+        ("El Barreal", "32040", 31.7370, -106.4570),
+        ("Obrera", "32050", 31.7300, -106.4800),
+        ("Chaveña", "32060", 31.7470, -106.4960),
+        ("Monterrey", "32070", 31.7260, -106.4740),
+        ("Corregidora", "32080", 31.7230, -106.4800),
+        ("Altavista", "32120", 31.7220, -106.4900),
+        ("Bellavista", "32130", 31.7300, -106.4850),
+        ("Barrio Alto", "32160", 31.7450, -106.4930),
+        ("Chamizal", "32300", 31.7560, -106.4590),
+        ("Hidalgo", "32300", 31.7350, -106.4780),
+        ("Margaritas", "32300", 31.7270, -106.4510),
+        ("Monumental", "32310", 31.7340, -106.4500),
+        ("Progresista", "32310", 31.7300, -106.4470),
+        ("Los Álamos", "32310", 31.7270, -106.4420),
+        ("Pronaf", "32315", 31.7440, -106.4720),
+        ("Panamericana", "32320", 31.7230, -106.4380),
+        ("Burócrata", "32330", 31.7170, -106.4410),
+    ],
+    "NORPONIENTE": [
+        ("Felipe Ángeles", "32100", 31.7443, -106.5012),
+        ("La Mesita", "32100", 31.7520, -106.5180),
+        ("Anapra", "32107", 31.7868, -106.5470),
+        ("Lomas de Poleo", "32107", 31.7925, -106.5620),
+        ("Rancho Anapra", "32107", 31.7840, -106.5520),
+        ("La Conquista", "32107", 31.7760, -106.5390),
+        ("Ladrillera Juárez", "32108", 31.7680, -106.5300),
+        ("Popular", "32110", 31.7480, -106.5080),
+        ("Niños Héroes", "32130", 31.7360, -106.5000),
+        ("Arroyo Colorado", "32140", 31.7330, -106.5080),
+        ("Insurgentes", "32150", 31.7250, -106.5060),
+        ("Lázaro Cárdenas", "32150", 31.7220, -106.5110),
+        ("Durango", "32160", 31.7410, -106.5010),
+        ("Francisco I. Madero", "32170", 31.7380, -106.5130),
+        ("Fronteriza", "32180", 31.7420, -106.5200),
+        ("Vicente Guerrero", "32190", 31.7350, -106.5250),
+        ("Plutarco Elías Calles", "32217", 31.7340, -106.5030),
+        ("Mariano Escobedo", "32230", 31.7480, -106.5120),
+        ("Azteca", "32280", 31.7270, -106.5100),
+    ],
+    "PONIENTE": [
+        ("Francisco Villa", "32110", 31.7110, -106.4940),
+        ("16 de Septiembre", "32210", 31.7250, -106.5200),
+        ("Adolfo López Mateos", "32220", 31.7200, -106.5100),
+        ("Álvaro Obregón", "32220", 31.7170, -106.5050),
+        ("Hermenegildo Galeana", "32230", 31.7150, -106.5000),
+        ("San Antonio", "32250", 31.7180, -106.4960),
+        ("Constitución", "32260", 31.7100, -106.4930),
+        ("Industrial", "32270", 31.7080, -106.4880),
+        ("Libertad", "32290", 31.7060, -106.4990),
+        ("Ricardo Flores Magón", "32290", 31.7030, -106.4950),
+        ("Vista Hermosa", "32295", 31.6980, -106.5000),
+        ("Los Nogales", "32340", 31.7090, -106.4720),
+        ("Satélite", "32543", 31.7050, -106.4560),
+        ("Infonavit Casas Grandes", "32600", 31.7182, -106.4529),
+        ("Hacienda de las Torres", None, 31.7160, -106.4380),
+        ("Paseo de la Victoria", None, 31.7000, -106.4470),
+        ("Villa Colonial", None, 31.7020, -106.4820),
+        ("Mezquital", None, 31.6930, -106.4780),
+        ("Morelos", None, 31.6900, -106.4660),
+    ],
+    "NORORIENTE": [
+        ("Aurora", "32350", 31.7090, -106.4300),
+        ("La Raza", "32360", 31.7070, -106.4350),
+        ("Olimpia", "32370", 31.7020, -106.4400),
+        ("Jardines de San José", "32390", 31.6950, -106.4200),
+        ("Alameda", "32400", 31.6930, -106.4370),
+        ("Infonavit San Lorenzo", "32420", 31.7050, -106.4100),
+        ("Villas San Marcos", "32450", 31.6830, -106.4120),
+        ("Campos Elíseos", "32472", 31.7230, -106.4110),
+        ("Fuentes del Valle", "32500", 31.6980, -106.4180),
+        ("Villahermosa", "32510", 31.7080, -106.4050),
+        ("Hacienda de San Pedro", "32520", 31.7020, -106.3980),
+        ("Partido Senecu", "32545", 31.7150, -106.4000),
+        ("Valle del Sol", "32546", 31.7050, -106.4020),
+        ("Jardines de San Patricio", "32546", 31.6930, -106.3850),
+        ("Ciudad Río Bravo", "32550", 31.6890, -106.3750),
+        ("Waterfill Río Bravo", "32553", 31.6870, -106.3650),
+        ("Zaragoza", "32560", 31.6890, -106.3870),
+        ("Senderos de San Isidro", None, 31.6790, -106.3700),
+        ("Misión de los Lagos", None, 31.7210, -106.4180),
+        ("Oasis Revolución", None, 31.7120, -106.3950),
+    ],
+    "SURORIENTE": [
+        ("Las Flores", "32560", 31.6850, -106.3800),
+        ("San Pablo", "32560", 31.6800, -106.3600),
+        ("Jardines del Valle", "32563", 31.6760, -106.3750),
+        ("Morelos I", "32573", 31.6620, -106.3920),
+        ("Prados de Salvárcar", "32573", 31.6600, -106.3800),
+        ("Carlos Castillo Peraza", "32575", 31.6400, -106.3900),
+        ("Manuel J. Clouthier", "32575", 31.6450, -106.3960),
+        ("Terranova", "32576", 31.6350, -106.4000),
+        ("Salvárcar", "32580", 31.6550, -106.3650),
+        ("Lucio Blanco", "32583", 31.6600, -106.3500),
+        ("Buenos Aires", "32590", 31.6700, -106.3500),
+        ("Águilas de Zaragoza", "32599", 31.6650, -106.3400),
+        ("Parajes del Sur", None, 31.6340, -106.3920),
+        ("Riberas del Bravo", None, 31.6350, -106.3500),
+        ("Villas de Salvárcar", None, 31.6420, -106.3650),
+        ("Lote Bravo", None, 31.6270, -106.3800),
+        ("Parajes de San Isidro", None, 31.6190, -106.3550),
+        ("Tierra Nueva", None, 31.6040, -106.3700),
+        ("San Lorenzo", None, 31.6130, -106.3330),
+        ("Praderas del Sur", None, 31.6250, -106.3980),
+        ("Ejido Salvárcar", None, 31.6480, -106.3400),
+    ],
+    "SURPONIENTE": [
+        ("Campestre", "32460", 31.6650, -106.4300),
+        ("Infonavit Mil Cumbres", "32600", 31.6900, -106.4560),
+        ("Floresta", "32617", 31.6850, -106.4520),
+        ("Acacias", "32630", 31.6800, -106.4620),
+        ("México 68", "32640", 31.6750, -106.4750),
+        ("Andrés Figueroa", "32650", 31.6700, -106.4800),
+        ("Del Real", "32660", 31.6600, -106.4720),
+        ("1 de Mayo", "32670", 31.6620, -106.4560),
+        ("Ciudad Moderna", "32670", 31.6580, -106.4610),
+        ("Colinas de Juárez", "32680", 31.6560, -106.4440),
+        ("Lomas de San José", "32680", 31.6500, -106.4700),
+        ("Aeropuerto", "32690", 31.6380, -106.4300),
+        ("Kilómetro 20", "32695", 31.6200, -106.4500),
+        ("15 de Enero", "32696", 31.6300, -106.4880),
+        ("Sierra Vista", None, 31.6700, -106.4500),
+        ("Lomas del Rey", None, 31.6600, -106.4680),
+        ("Cerradas de Cumbres", None, 31.6480, -106.4600),
+        ("Torres del Sur", None, 31.6420, -106.4300),
+        ("Real del Sur", None, 31.6380, -106.4170),
+    ],
+}
+
+# Vista plana (clave de sector, nombre, código postal, latitud, longitud).
 COLONIAS = [
-    ("NORPONIENTE", "Anapra", "32100", 31.7868, -106.5470),
-    ("NORPONIENTE", "Lomas de Poleo", "32100", 31.7925, -106.5620),
-    ("NORPONIENTE", "Felipe Ángeles", "32090", 31.7443, -106.5012),
-    ("NORPONIENTE", "Mariano Escobedo", None, 31.7480, -106.5120),
-    ("NORPONIENTE", "Plutarco Elías Calles", None, 31.7340, -106.5030),
-    ("NORPONIENTE", "Azteca", None, 31.7270, -106.5100),
-    ("NORORIENTE", "Fuentes del Valle", "32500", 31.6980, -106.4180),
-    ("NORORIENTE", "Zaragoza", "32580", 31.6890, -106.3870),
-    ("NORORIENTE", "Senderos de San Isidro", None, 31.6790, -106.3700),
-    ("NORORIENTE", "Valle del Sol", "32540", 31.7050, -106.4020),
-    ("NORORIENTE", "Misión de los Lagos", None, 31.7210, -106.4180),
-    ("NORORIENTE", "Oasis Revolución", None, 31.7120, -106.3950),
-    ("CENTRO", "Centro", "32000", 31.7390, -106.4870),
-    ("CENTRO", "Chamizal", "32310", 31.7560, -106.4590),
-    ("CENTRO", "Pronaf", "32315", 31.7440, -106.4720),
-    ("CENTRO", "Partido Romero", "32030", 31.7330, -106.4630),
-    ("CENTRO", "Margaritas", None, 31.7270, -106.4510),
-    ("CENTRO", "Hidalgo", None, 31.7350, -106.4780),
-    ("CENTRO", "Bellavista", None, 31.7300, -106.4850),
-    ("CENTRO", "Barrio Alto", None, 31.7450, -106.4930),
-    ("CENTRO", "Altavista", None, 31.7220, -106.4900),
-    ("PONIENTE", "Infonavit Casas Grandes", "32310", 31.7182, -106.4529),
-    ("PONIENTE", "Los Nogales", None, 31.7090, -106.4720),
-    ("PONIENTE", "Satélite", None, 31.7050, -106.4560),
-    ("PONIENTE", "Hacienda de las Torres", None, 31.7160, -106.4380),
-    ("PONIENTE", "Paseo de la Victoria", None, 31.7000, -106.4470),
-    ("PONIENTE", "Villa Colonial", None, 31.7020, -106.4820),
-    ("PONIENTE", "Mezquital", None, 31.6930, -106.4780),
-    ("PONIENTE", "Morelos", None, 31.6900, -106.4660),
-    ("PONIENTE", "Francisco Villa", None, 31.7110, -106.4940),
-    ("SURORIENTE", "Parajes del Sur", "32575", 31.6340, -106.3920),
-    ("SURORIENTE", "Riberas del Bravo", "32474", 31.6350, -106.3500),
-    ("SURORIENTE", "Villas de Salvárcar", None, 31.6420, -106.3650),
-    ("SURORIENTE", "Lote Bravo", None, 31.6270, -106.3800),
-    ("SURORIENTE", "Parajes de San Isidro", None, 31.6190, -106.3550),
-    ("SURORIENTE", "Tierra Nueva", None, 31.6040, -106.3700),
-    ("SURORIENTE", "San Lorenzo", None, 31.6130, -106.3330),
-    ("SURORIENTE", "Praderas del Sur", None, 31.6250, -106.3980),
-    ("SURORIENTE", "Ejido Salvárcar", None, 31.6480, -106.3400),
-    ("SURPONIENTE", "Sierra Vista", None, 31.6700, -106.4500),
-    ("SURPONIENTE", "Colinas de Juárez", None, 31.6560, -106.4440),
-    ("SURPONIENTE", "Lomas del Rey", None, 31.6600, -106.4680),
-    ("SURPONIENTE", "Cerradas de Cumbres", None, 31.6480, -106.4600),
-    ("SURPONIENTE", "Torres del Sur", None, 31.6420, -106.4300),
-    ("SURPONIENTE", "Real del Sur", None, 31.6380, -106.4170),
-    ("SURPONIENTE", "Campestre", None, 31.6650, -106.4300),
+    (clave, nombre, cp, lat, lon) for clave, filas in COLONIAS_POR_SECTOR.items() for nombre, cp, lat, lon in filas
 ]
 
 CALLES = [
@@ -140,8 +237,10 @@ MOTIVOS_RECHAZO = [
     "El punto señalado está dentro de un predio privado, fuera de la vía pública.",
 ]
 
-N_PAVIMENTO = 170
-N_ENCHARCAMIENTOS = 55
+# RNF-09: ≥ 500 reportes públicos (los «Rechazado» no cuentan). Con las proporciones de destino de
+# Generador (≈ 8 % de pavimento y ≈ 4 % de encharcamientos rechazados) quedan ≈ 540 visibles.
+N_PAVIMENTO = 420
+N_ENCHARCAMIENTOS = 160
 PESO_MES_PAVIMENTO = [3, 3, 3, 3, 4, 4, 5, 5, 5, 4, 3]  # enero–noviembre
 PESO_MES_LLUVIA = [1, 1, 1, 1, 2, 3, 10, 14, 10, 4, 2]  # temporada de lluvias: jul–sep
 
@@ -150,7 +249,16 @@ PESO_MES_LLUVIA = [1, 1, 1, 1, 2, 3, 10, 14, 10, 4, 2]  # temporada de lluvias: 
 
 
 def sembrar_usuarios(db) -> dict[str, list[Usuario]]:
-    contrasena = os.environ.get("SEED_PASSWORD", CONTRASENA_POR_OMISION)
+    contrasena = os.environ.get("SEED_PASSWORD", "").strip()
+    if not contrasena:
+        # Sin valor por omisión en el código (OWASP A02): la contraseña aleatoria no se muestra ni se registra.
+        log.warning(
+            "SEED_PASSWORD no está definida: las cuentas de prueba nuevas reciben una contraseña aleatoria "
+            "no revelada. Defínela en .env (ver .env.example) para poder iniciar sesión con ellas."
+        )
+        contrasena = f"{secrets.token_urlsafe(24)}a1"
+    elif not contrasena_valida(contrasena):
+        raise SystemExit(f"SEED_PASSWORD no cumple la política de contraseñas: {MENSAJE_CONTRASENA}")
     hash_comun = hashear_contrasena(contrasena)
     definiciones = [
         ("Coordinación Calles Seguras", "coordinador@ejemplo.mx", RolUsuario.COORDINADOR),
@@ -178,18 +286,28 @@ def sembrar_territorio(db) -> list[Colonia]:
             db.add(Sector(clave=clave, nombre=nombre))
     db.commit()
     sectores = {s.clave: s for s in db.scalars(select(Sector))}
-    nuevas = 0
+    nuevas = actualizadas = 0
     for clave, nombre, cp, lat, lon in COLONIAS:
-        sector = sectores[clave]
-        existe = db.scalar(select(Colonia.id).where(Colonia.sector_id == sector.id, Colonia.nombre == nombre))
-        if existe is None:
+        # Se identifica por nombre (sin distinguir mayúsculas) en cualquier sector: si el coordinador ya la
+        # movió de sector o la editó, la semilla no la duplica ni pisa sus datos, sólo completa el código postal.
+        existente = db.scalar(select(Colonia).where(func.lower(Colonia.nombre) == nombre.lower()).limit(1))
+        if existente is None:
             db.add(
-                Colonia(sector_id=sector.id, nombre=nombre, codigo_postal=cp, latitud_centro=lat, longitud_centro=lon)
+                Colonia(
+                    sector_id=sectores[clave].id, nombre=nombre, codigo_postal=cp,
+                    latitud_centro=lat, longitud_centro=lon,
+                )
             )
             nuevas += 1
+        elif cp is not None and existente.codigo_postal != cp:
+            existente.codigo_postal = cp
+            actualizadas += 1
     db.commit()
-    colonias = list(db.scalars(select(Colonia).order_by(Colonia.id)))
-    log.info("Territorio: %s sectores, %s colonias (%s nuevas)", len(sectores), len(colonias), nuevas)
+    colonias = list(db.scalars(select(Colonia).where(Colonia.activo).order_by(Colonia.id)))
+    log.info(
+        "Territorio: %s sectores, %s colonias activas (%s nuevas, %s con código postal actualizado)",
+        len(sectores), len(colonias), nuevas, actualizadas,
+    )
     return colonias
 
 
@@ -416,13 +534,20 @@ class Generador:
 
 
 def sembrar_reportes(db, colonias: list[Colonia], por_rol: dict[str, list[Usuario]]) -> None:
-    if db.scalar(select(func.count()).select_from(Reporte)):
-        log.info("Ya existen reportes: no se vuelven a sembrar (idempotente).")
+    """Completa la meta de reportes de demostración; si ya se alcanzó, no hace nada (idempotente)."""
+    es_enc = Reporte.tipo_dano == TipoDano.ENCHARCAMIENTO
+    pavimento = db.scalar(select(func.count()).select_from(Reporte).where(~es_enc)) or 0
+    encharcamientos = db.scalar(select(func.count()).select_from(Reporte).where(es_enc)) or 0
+    faltan_pav = max(0, N_PAVIMENTO - pavimento)
+    faltan_enc = max(0, N_ENCHARCAMIENTOS - encharcamientos)
+    if not faltan_pav and not faltan_enc:
+        log.info("Ya existen %s reportes: no se vuelven a sembrar (idempotente).", pavimento + encharcamientos)
         return
-    gen = Generador(db, random.Random(SEMILLA_ALEATORIA), colonias, por_rol)
-    for i in range(N_PAVIMENTO):
+    # Semilla distinta por punto de partida: una base vacía siempre produce el mismo conjunto.
+    gen = Generador(db, random.Random(SEMILLA_ALEATORIA + pavimento + encharcamientos), colonias, por_rol)
+    for i in range(faltan_pav):
         gen.pavimento(i)
-    for i in range(N_ENCHARCAMIENTOS):
+    for i in range(faltan_enc):
         gen.encharcamiento(i)
     db.commit()
     por_estado = db.execute(select(Reporte.estado, func.count()).group_by(Reporte.estado).order_by(Reporte.estado)).all()

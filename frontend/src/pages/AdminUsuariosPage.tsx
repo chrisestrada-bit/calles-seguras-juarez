@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
+import { fechaDeInstante } from '../utils/formato';
+import { useAuth } from '../context/useAuth';
 import { ErrorMessage, Guard, PageIntro, Pagination } from '../components/AdminShared';
 import { Icon } from '../components/Icon';
 import { EmptyState, TableSkeleton } from '../components/ui';
@@ -9,40 +11,28 @@ import type { CambiarEstadoResponse, CambiarRolResponse, RespuestaPaginada, Rol,
 const POR_PAGINA = 20;
 const ROLES: Array<Exclude<Rol, 'visitante'>> = ['ciudadano', 'moderador', 'coordinador'];
 const consulta = (valores: Record<string, string | number>) => Object.entries(valores).filter(([, v]) => v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
-const fecha = (valor: string) => new Date(valor).toLocaleString('es-MX', { dateStyle: 'medium', timeZone: 'America/Ciudad_Juarez' });
+const fecha = fechaDeInstante; // RN-02
 
 export function AdminUsuariosPage() {
   const { usuario } = useAuth();
-  const [filas, setFilas] = useState<UsuarioAdmin[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [q, setQ] = useState('');
   const [rol, setRol] = useState('');
   const [activo, setActivo] = useState('');
   const [pagina, setPagina] = useState(1);
-  const [total, setTotal] = useState(1);
-  const [estado, setEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
-  const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [errorAccion, setErrorAccion] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
 
-  useEffect(() => {
-    let vigente = true;
-    setEstado('cargando');
-    api.get<RespuestaPaginada<UsuarioAdmin>>(`/api/v1/admin/usuarios?${consulta({ q, rol, activo, pagina, por_pagina: POR_PAGINA })}`)
-      .then((r) => {
-        if (!vigente) return;
-        setFilas(r.datos);
-        setTotal(r.paginacion.total_paginas || 1);
-        setEstado('listo');
-      })
-      .catch((e) => {
-        if (!vigente) return;
-        setError(e instanceof ApiError ? e.message : 'No fue posible cargar los usuarios.');
-        setEstado('error');
-      });
-    return () => { vigente = false; };
-  }, [q, rol, activo, pagina]);
+  const consultaUsuarios = useCargaDatos<RespuestaPaginada<UsuarioAdmin>>(
+    `/api/v1/admin/usuarios?${consulta({ q, rol, activo, pagina, por_pagina: POR_PAGINA })}`,
+    obtenerJson,
+    'No fue posible cargar los usuarios.',
+  );
+  const { estado, error, actualizar } = consultaUsuarios;
+  const filas = consultaUsuarios.datos?.datos ?? [];
+  const total = consultaUsuarios.datos?.paginacion.total_paginas || 1;
+  const setFilas = (cambio: (actual: UsuarioAdmin[]) => UsuarioAdmin[]) => actualizar((d) => ({ ...d, datos: cambio(d.datos) }));
 
   const buscar = (evento: FormEvent) => {
     evento.preventDefault();

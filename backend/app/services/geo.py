@@ -1,6 +1,7 @@
 """Límites territoriales (RN-01) y distancia de Haversine."""
 
 import math
+import re
 
 LAT_MIN, LAT_MAX = 31.45, 31.80
 LON_MIN, LON_MAX = -106.65, -106.25
@@ -9,6 +10,14 @@ METROS_POR_GRADO_LAT = 111_320.0
 
 RADIO_DUPLICADO_PAVIMENTO_M = 30  # HU-02.3
 RADIO_DUPLICADO_ENCHARCAMIENTO_M = 50  # HU-03.1
+
+# Códigos postales del municipio de Juárez (SEPOMEX): 32000–32730.
+CP_MIN, CP_MAX = "32000", "32730"
+_PATRON_CP = re.compile(r"[0-9]{5}")
+
+
+def es_codigo_postal_juarez(valor: str) -> bool:
+    return bool(_PATRON_CP.fullmatch(valor)) and CP_MIN <= valor <= CP_MAX
 
 
 def dentro_de_juarez(latitud: float, longitud: float) -> bool:

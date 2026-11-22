@@ -12,6 +12,15 @@ class RegistroIn(Esquema):
     nombre: str = Field(min_length=2, max_length=120)
     correo: EmailStr = Field(max_length=254)
     contrasena: str = Field(max_length=128)
+    # HU-01.2: el consentimiento se exige también en el servidor, no sólo en el formulario.
+    acepta_aviso_privacidad: bool
+
+    @field_validator("acepta_aviso_privacidad")
+    @classmethod
+    def _consentimiento(cls, valor: bool) -> bool:
+        if valor is not True:
+            raise ValueError("Debes aceptar el aviso de privacidad para crear tu cuenta.")
+        return valor
 
     @field_validator("contrasena")
     @classmethod

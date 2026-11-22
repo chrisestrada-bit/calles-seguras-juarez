@@ -24,7 +24,7 @@ export type DetalleReporte = DetalleBache | DetalleAlcantarilla | DetalleEncharc
 export interface ReportePublico {
   folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad;
   ubicacion: Ubicacion; calle: string; referencia: string | null; colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo;
-  descripcion: string; detalle: DetalleReporte; confirmaciones: number; created_at: string; fecha_programada: string | null;
+  descripcion: string | null; detalle: DetalleReporte; confirmaciones: number; created_at: string; fecha_programada: string | null;
   fecha_reparacion: string | null; longevidad_dias: number | null; vigencia: Vigencia | null; es_mio?: boolean; ya_confirmado_por_mi?: boolean;
 }
 export interface ReporteResumenPublico {
@@ -41,7 +41,7 @@ export interface RespuestaError { error: ErrorApi; }
 
 export interface UsuarioResumen { id: string; nombre: string; rol: Exclude<Rol, 'visitante'>; }
 export interface UsuarioRegistro extends UsuarioResumen { created_at: string; }
-export interface RegistroRequest { nombre: string; correo: string; contrasena: string; }
+export interface RegistroRequest { nombre: string; correo: string; contrasena: string; acepta_aviso_privacidad: boolean; }
 export interface LoginRequest { correo: string; contrasena: string; }
 export interface LoginResponse { access_token: string; token_type: 'bearer'; expira_en_segundos: number; usuario: UsuarioResumen; }
 export interface UsuarioYo extends UsuarioResumen { correo: string; reportes_ultima_hora: number; limite_reportes_hora: number; }
@@ -50,6 +50,8 @@ export interface ReporteBacheRequest { tipo_dano: 'Bache'; latitud: number; long
 export interface ReporteAlcantarillaRequest { tipo_dano: 'Alcantarilla sin tapa'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; esta_senalizado: boolean; forzar_nuevo: boolean; }
 export interface ReporteEncharcamientoRequest { tipo_dano: 'Encharcamiento'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; nivel_agua: NivelAgua; hay_riesgo_personas_vehiculos?: boolean; forzar_nuevo: boolean; }
 export type CrearReporteRequest = ReporteBacheRequest | ReporteAlcantarillaRequest | ReporteEncharcamientoRequest;
+/** HU-02.5: sólo en «Recibido»; folio, tipo, ubicación y fecha son inmutables. */
+export interface EditarReporteRequest { colonia_id?: number; calle?: string; referencia?: string | null; descripcion?: string | null; tamano?: Tamano; profundidad?: Profundidad; carril_afectado?: CarrilAfectado; esta_senalizado?: boolean; }
 export interface ReporteAutenticado extends ReportePublico { es_mio: boolean; ya_confirmado_por_mi?: boolean; }
 export interface CandidatoCercano { folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad; calle: string; distancia_metros: number; confirmaciones: number; ya_confirmado_por_mi: boolean; es_mio: boolean; created_at: string; }
 export interface CercanosResponse { radio_metros: number; candidatos: CandidatoCercano[]; }
@@ -84,7 +86,8 @@ export interface ColoniaUpdate extends Partial<ColoniaRequest> { activo?: boolea
 export interface Periodo { desde: string; hasta: string; zona_horaria: 'America/Ciudad_Juarez'; }
 export interface IndicadoresResumen { periodo: Periodo; pavimento: { total: number; por_estado: Record<EstadoPavimento, number>; por_tipo: Record<'Bache' | 'Alcantarilla sin tapa', number>; longevidad_promedio_abiertos_dias: number; tiempo_promedio_reparacion_dias: number; }; encharcamientos: { total: number; activos: number; historicos: number; intransitables: number; }; actualizado_en: string; }
 export interface IndicadorSector { sector: ReferenciaCatalogo; baches_abiertos: number; reparados: number; longevidad_promedio_abiertos_dias: number; encharcamientos_total: number; encharcamientos_activos: number; }
-export interface IndicadorLongevidad extends Pick<ReporteResumenPublico, 'folio' | 'tipo_dano' | 'estado' | 'severidad' | 'calle' | 'colonia' | 'created_at' | 'longevidad_dias'> {}
+export interface IndicadorLongevidad extends Pick<ReporteResumenPublico, 'folio' | 'tipo_dano' | 'estado' | 'severidad' | 'calle' | 'colonia' | 'created_at'> { longevidad_dias: number; }
+export interface IndicadoresLongevidad { datos: IndicadorLongevidad[]; }
 export interface IndicadoresModeracion { pendientes_validacion: number; antiguedad_max_pendiente_horas: number; tiempo_promedio_validacion_horas: number; rechazados_periodo: number; tasa_rechazo_pct: number; reportes_forzados_como_nuevos: number; encharcamientos_rechazados: number; }
 export interface AuditoriaItem { folio: string; estado_anterior: EstadoReporte | null; estado_nuevo: EstadoReporte; origen: OrigenHistorial; actor_id: string; actor_rol: Rol; motivo: string | null; fecha: string; }
 export interface ClimaActual { temperatura_c: number; precipitacion_mm: number; descripcion: string; }
@@ -92,6 +95,8 @@ export interface PronosticoHora { hora: string; probabilidad_lluvia_pct: number;
 export interface PronosticoResponse { ubicacion: string; actual: ClimaActual; proximas_horas: PronosticoHora[]; alerta_lluvia: boolean; mensaje_alerta: string | null; obtenido_en: string; desactualizado: boolean; }
 export interface RiesgoCalle { calle: string; colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo; nivel_riesgo: 'Alto' | 'Medio' | 'Bajo'; encharcamientos_activos: number; nivel_agua_maximo_activo: NivelAgua | null; encharcamientos_historicos_12_meses: number; ultimo_reporte: string | null; folios_activos: string[]; recomendacion: string; }
 export interface RiesgoInundacionResponse { alerta_lluvia: boolean; datos: RiesgoCalle[]; criterio: string; obtenido_en: string; }
-export interface GeocodingResultado { etiqueta: string; calle: string | null; ubicacion: Ubicacion; precision: 'direccion' | 'calle' | 'colonia' | 'aproximada'; colonia_sugerida: (ReferenciaCatalogo & { sector: ReferenciaCatalogo }) | null; }
+export interface ColoniaSugerida extends ReferenciaCatalogo { sector: ReferenciaCatalogo; codigo_postal?: string | null; }
+export interface GeocodingResultado { etiqueta: string; calle: string | null; ubicacion: Ubicacion; precision: 'direccion' | 'calle' | 'colonia' | 'aproximada'; colonia_sugerida: ColoniaSugerida | null; }
 export interface GeocodingResponse { fuente: 'locationiq' | 'catalogo_local'; degradado: boolean; datos: GeocodingResultado[]; atribucion: string | null; mensaje: string | null; }
+export interface GeocodingInversaResponse { fuente: 'locationiq' | 'catalogo_local'; degradado: boolean; ubicacion: Ubicacion; calle: string | null; etiqueta: string; colonia_sugerida: ColoniaSugerida | null; colonias_cercanas: Array<ColoniaSugerida & { distancia_metros: number }>; atribucion: string | null; mensaje: string | null; }
 export interface ColoniasResponse { datos: Colonia[]; paginacion: Paginacion; }

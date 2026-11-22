@@ -1,5 +1,7 @@
 """Catálogos: sectores, colonias, formulario dinámico por tipo de daño y estados."""
 
+import re
+
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,12 @@ from app.services.sqlutil import error_validacion, escapar_like
 from app.services.vigencia import DESMENTIDOS_PARA_HISTORICO, HORAS_VIGENCIA
 
 SIMILITUD_MINIMA = 0.3
+_PREFIJO_CP = re.compile(r"[0-9]{2,5}")
+
+
+def es_prefijo_cp(q: str) -> bool:
+    """True si la consulta es un código postal (o su prefijo): sólo dígitos, de 2 a 5."""
+    return bool(_PREFIJO_CP.fullmatch(q))
 
 
 def listar_sectores(db: Session) -> list[Sector]:
@@ -27,14 +35,18 @@ def listar_sectores(db: Session) -> list[Sector]:
 def buscar_colonias(
     db: Session, *, q: str | None, sector_id: int | None, limite: int | None = None, pag: ParametrosPagina | None = None
 ) -> tuple[list[Colonia], int]:
-    """Filtro por nombre (ILIKE + similitud por trigramas) y por sector; ambos combinables."""
+    """Filtro por nombre (ILIKE + similitud por trigramas) o por código postal, y por sector; combinables."""
     condiciones = [Colonia.activo]
     if sector_id is not None:
         if db.get(Sector, sector_id) is None:
             raise error_validacion("sector_id", f"El sector {sector_id} no existe.")
         condiciones.append(Colonia.sector_id == sector_id)
     orden = [Colonia.nombre]
-    if q:
+    if q and es_prefijo_cp(q):
+        # Búsqueda por código postal (completo o prefijo de al menos 2 dígitos), p. ej. ?q=32310 o ?q=325.
+        condiciones.append(Colonia.codigo_postal.like(f"{q}%"))
+        orden = [Colonia.codigo_postal, Colonia.nombre]
+    elif q:
         similitud = func.similarity(Colonia.nombre, q)
         condiciones.append(or_(Colonia.nombre.ilike(f"%{escapar_like(q)}%", escape="\\"), similitud > SIMILITUD_MINIMA))
         orden = [case((func.lower(Colonia.nombre) == q.lower(), 0), else_=1), similitud.desc(), Colonia.nombre]

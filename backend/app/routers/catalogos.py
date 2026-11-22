@@ -37,11 +37,11 @@ def sectores(db: Session = Depends(get_db)) -> ListaSectores:
 @router.get(
     "/colonias",
     response_model=Pagina[ColoniaCatalogo],
-    summary="Colonias activas; filtro por nombre (q) y por sector (sector_id)",
+    summary="Colonias activas; filtro por nombre o código postal (q) y por sector (sector_id)",
     responses=respuestas(422),
 )
 def colonias(
-    q: Annotated[str | None, Query(min_length=2, max_length=80, description="Nombre (parcial, tolera errores).")] = None,
+    q: Annotated[str | None, Query(min_length=2, max_length=80, description="Nombre (parcial, tolera errores) o código postal (32000–32730, completo o prefijo).")] = None,
     sector_id: Annotated[int | None, Query(ge=1)] = None,
     pag: ParametrosPagina = Depends(),
     db: Session = Depends(get_db),

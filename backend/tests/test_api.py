@@ -44,7 +44,7 @@ def test_salud(client):
 
 def test_registro_login_y_yo(client):
     correo = "nueva-persona@ejemplo.mx"
-    datos = {"nombre": "Nueva Persona", "correo": correo, "contrasena": CONTRASENA}
+    datos = {"nombre": "Nueva Persona", "correo": correo, "contrasena": CONTRASENA, "acepta_aviso_privacidad": True}
     r = client.post(f"{API}/auth/registro", json=datos)
     if r.status_code == 409:  # la prueba ya corrió antes sobre esta base
         assert r.json()["error"]["codigo"] == "CORREO_REGISTRADO"
@@ -399,7 +399,9 @@ def test_admin(client, coordinador, moderador):
     assert r.status_code == 201
     sector_id = r.json()["id"]
     assert client.post(f"{API}/admin/sectores", json={"clave": clave, "nombre": "Otro"}, headers=coordinador.h).status_code == 409
-    nueva = {"sector_id": sector_id, "nombre": "Colonia de Prueba", "codigo_postal": "32999", "latitud_centro": 31.5, "longitud_centro": -106.5}
+    nueva = {"sector_id": sector_id, "nombre": "Colonia de Prueba", "codigo_postal": "32599", "latitud_centro": 31.5, "longitud_centro": -106.5}
+    cp_ajeno = client.post(f"{API}/admin/colonias", json={**nueva, "codigo_postal": "32999"}, headers=coordinador.h)
+    assert cp_ajeno.status_code == 422  # fuera del rango de Juárez (32000–32730)
     assert client.post(f"{API}/admin/colonias", json=nueva, headers=coordinador.h).status_code == 201
     fuera = client.post(f"{API}/admin/colonias", json={**nueva, "nombre": "Fuera", "latitud_centro": 35}, headers=coordinador.h)
     assert fuera.status_code == 422 and fuera.json()["error"]["codigo"] == "FUERA_DE_JUAREZ"
@@ -476,6 +478,7 @@ def test_clima_cache_y_degradacion(client, db, monkeypatch):
 
     db.execute(text("DELETE FROM cache_clima"))
     db.commit()
+    clima.reiniciar_retroceso()
 
     def caido():
         raise httpx.ConnectError("sin red")
@@ -489,6 +492,7 @@ def test_clima_cache_y_degradacion(client, db, monkeypatch):
     inicio = ahora_utc().replace(minute=0, second=0, microsecond=0)
     horas = [{"hora": (inicio + timedelta(hours=i)).isoformat(), "prob": 80 if i == 1 else 10, "mm": 2.5 if i == 1 else 0} for i in range(0, 10)]
     normalizada = {"actual": {"temperatura_c": 14.2, "precipitacion_mm": 0.0, "descripcion": "Lluvia ligera"}, "horas": horas}
+    clima.reiniciar_retroceso()  # el fallo anterior activó el retroceso (D-24)
     monkeypatch.setattr(clima, "_consultar_proveedor", lambda: normalizada)
     ok = client.get(f"{API}/clima/pronostico").json()
     assert ok["alerta_lluvia"] is True and ok["desactualizado"] is False and len(ok["proximas_horas"]) == 6

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.models import RolUsuario
 from app.schemas.comun import Esquema, FechaLocal, Latitud, Longitud, SectorRef
 from app.schemas.catalogos import Centro
+from app.services.geo import CP_MAX, CP_MIN, es_codigo_postal_juarez
 
 
 class UsuarioAdmin(BaseModel):
@@ -68,8 +69,8 @@ class _ColoniaBase(Esquema):
     @field_validator("codigo_postal", check_fields=False)
     @classmethod
     def _cp(cls, valor: str | None) -> str | None:
-        if valor is not None and not re.fullmatch(r"32[0-9]{3}", valor):
-            raise ValueError("El código postal debe tener 5 dígitos y comenzar con 32.")
+        if valor is not None and not es_codigo_postal_juarez(valor):
+            raise ValueError(f"El código postal debe ser de Ciudad Juárez ({CP_MIN}–{CP_MAX}).")
         return valor
 
 

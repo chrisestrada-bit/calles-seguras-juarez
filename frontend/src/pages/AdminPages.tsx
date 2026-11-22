@@ -1,12 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '../services/api';
-import type { AuditoriaItem, EstadoReporte, IndicadorSector, IndicadoresResumen, ReporteModeracionDetalle, ReporteModeracionResumen, RespuestaPaginada, TransicionResponse } from '../types/api';
+import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
+import { antiguedadTexto, fechaHora } from '../utils/formato';
+import type { AuditoriaItem, EstadoReporte, IndicadorSector, IndicadoresLongevidad, IndicadoresResumen, ReporteModeracionDetalle, ReporteModeracionResumen, RespuestaPaginada, TransicionResponse } from '../types/api';
 import { Guard, ErrorMessage, PageIntro, Pagination } from '../components/AdminShared';
 import { Icon, type IconName } from '../components/Icon';
 import { BlockSkeleton, EmptyState, Notice, SeverityBadge, StatusBadge, TableSkeleton, TypeBadge } from '../components/ui';
 
 const PAGE_SIZE = 10;
-const formatDate = (value: string) => new Date(value).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+const formatDate = fechaHora; // RN-02: siempre en hora de Ciudad Juárez
 const makeQuery = (values: Record<string, string | number | undefined>) => Object.entries(values).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${key}=${encodeURIComponent(value as string | number)}`).join('&');
 
 function TransitionForm({ report, onComplete }: { report: ReporteModeracionResumen; onComplete: (response: TransicionResponse) => void }) {
@@ -26,9 +28,8 @@ function TransitionForm({ report, onComplete }: { report: ReporteModeracionResum
 }
 
 function useModerationQueue(state: string, page: number, refresh: number) {
-  const [data, setData] = useState<ReporteModeracionResumen[]>([]); const [total, setTotal] = useState(1); const [status, setStatus] = useState('cargando'); const [error, setError] = useState('');
-  useEffect(() => { let active = true; setStatus('cargando'); api.get<RespuestaPaginada<ReporteModeracionResumen>>(`/api/v1/moderacion/reportes?${makeQuery({ estado: state, pagina: page, por_pagina: PAGE_SIZE })}`).then((response) => { if (active) { setData(response.datos); setTotal(response.paginacion.total_paginas || 1); setStatus('listo'); } }).catch((exception) => { if (active) { setError(exception instanceof ApiError ? exception.message : 'No fue posible cargar los reportes.'); setStatus('error'); } }); return () => { active = false; }; }, [state, page, refresh]);
-  return { data, total, status, error };
+  const result = useCargaDatos<RespuestaPaginada<ReporteModeracionResumen>>(`/api/v1/moderacion/reportes?${makeQuery({ estado: state, pagina: page, por_pagina: PAGE_SIZE })}#${refresh}`, obtenerJson, 'No fue posible cargar los reportes.');
+  return { data: result.datos?.datos ?? [], total: result.datos?.paginacion.total_paginas || 1, status: result.estado, error: result.error };
 }
 
 function QueueTable({ data, onComplete }: { data: ReporteModeracionResumen[]; onComplete: (folio: string, response: TransicionResponse) => void }) {
@@ -82,7 +83,7 @@ export function CoordinationPage() {
     <Guard roles={['coordinador']}>
       <main className="admin-page">
         <PageIntro title="Panel de coordinación">Da seguimiento a reportes validados, programa trabajos y registra el avance operativo por folio.</PageIntro>
-        <Notice tone="info"><strong>Seguimiento:</strong> el contrato registra asignación mediante el estado y el historial inmutable. La API actual no expone una asignación individual de cuadrilla.</Notice>
+        <Notice tone="info"><strong>Seguimiento:</strong> cada cambio de estado queda registrado con su fecha y responsable en el historial del reporte, que no se puede modificar.</Notice>
         <section className="filter-bar filter-bar--inline" aria-label="Filtro de bandeja">
           <div className="field"><label htmlFor="coordination-state">Bandeja operativa</label><select id="coordination-state" value={state} onChange={(event) => { setState(event.target.value); setPage(1); }}><option>Validado</option><option>Programado</option><option>En reparación</option><option>Reparado</option></select></div>
         </section>
@@ -131,9 +132,27 @@ function SectorChart({ items }: { items: IndicadorSector[] }) {
   );
 }
 
+interface DatosTablero { summary: IndicadoresResumen; sectors: IndicadorSector[]; longevity: IndicadoresLongevidad }
+
+/** Clave: `desde|hasta|sector`. Definida fuera del componente para que sea estable (useCargaDatos). */
+async function cargarTablero(clave: string): Promise<DatosTablero> {
+  const [desde, hasta, sector] = clave.split('|');
+  const [summary, zones, longevity] = await Promise.all([
+    api.get<IndicadoresResumen>(`/api/v1/indicadores/resumen?${makeQuery({ desde, hasta, sector_id: sector })}`),
+    api.get<{ datos: IndicadorSector[] }>(`/api/v1/indicadores/sectores?${makeQuery({ desde, hasta })}`),
+    api.get<IndicadoresLongevidad>(`/api/v1/indicadores/longevidad?${makeQuery({ sector_id: sector, limite: 10 })}`),
+  ]);
+  return { summary, sectors: zones.datos, longevity };
+}
+
 export function DashboardPage() {
-  const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [sector, setSector] = useState(''); const [summary, setSummary] = useState<IndicadoresResumen | null>(null); const [sectors, setSectors] = useState<IndicadorSector[]>([]); const [status, setStatus] = useState('cargando'); const [error, setError] = useState('');
-  useEffect(() => { let active = true; setStatus('cargando'); const params = makeQuery({ desde: from, hasta: to, sector_id: sector }); Promise.all([api.get<IndicadoresResumen>(`/api/v1/indicadores/resumen?${params}`), api.get<{ datos: IndicadorSector[] }>(`/api/v1/indicadores/sectores?${makeQuery({ desde: from, hasta: to })}`)]).then(([data, zones]) => { if (active) { setSummary(data); setSectors(zones.datos); setStatus('listo'); } }).catch((exception) => { if (active) { setError(exception instanceof ApiError ? exception.message : 'No fue posible cargar las métricas.'); setStatus('error'); } }); return () => { active = false; }; }, [from, to, sector]);
+  const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [sector, setSector] = useState('');
+  const tablero = useCargaDatos(`${from}|${to}|${sector}`, cargarTablero, 'No fue posible cargar las métricas.');
+  const status = tablero.estado; const error = tablero.error;
+  const summary = tablero.datos?.summary ?? null; const longest = tablero.datos?.longevity.datos ?? [];
+  // Las zonas del filtro salen del catálogo (estable): no se vacían mientras se recargan las métricas.
+  const zonas = useCargaDatos<{ datos: Array<{ id: number; nombre: string }> }>('/api/v1/catalogos/sectores', obtenerJson).datos?.datos ?? [];
+  const sectors = tablero.datos?.sectors ?? [];
   const valores = summary ? { pav: summary.pavimento.total, enc: summary.encharcamientos.total, act: summary.encharcamientos.activos, rep: summary.pavimento.tiempo_promedio_reparacion_dias.toFixed(1) } : null;
   const totalEstados = summary ? Object.values(summary.pavimento.por_estado).reduce((a, b) => a + b, 0) : 0;
   return (
@@ -144,7 +163,7 @@ export function DashboardPage() {
           <div className="filters filters--three">
             <div className="field"><label htmlFor="dash-desde">Desde</label><input id="dash-desde" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></div>
             <div className="field"><label htmlFor="dash-hasta">Hasta</label><input id="dash-hasta" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></div>
-            <div className="field"><label htmlFor="dash-zona">Zona</label><select id="dash-zona" value={sector} onChange={(event) => setSector(event.target.value)}><option value="">Todas las zonas</option>{sectors.map((item) => <option key={item.sector.id} value={item.sector.id}>{item.sector.nombre}</option>)}</select></div>
+            <div className="field"><label htmlFor="dash-zona">Zona</label><select id="dash-zona" value={sector} onChange={(event) => setSector(event.target.value)}><option value="">Todas las zonas</option>{zonas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></div>
           </div>
         </section>
         {status === 'cargando' && <div className="kpi-grid">{KPI.map((k) => <div className="kpi-card" key={k.key}><BlockSkeleton label="Cargando indicadores…" lines={1} /></div>)}</div>}
@@ -171,6 +190,35 @@ export function DashboardPage() {
                 ))}
               </dl>
             </section>
+            <section className="panel" aria-labelledby="tipo-titulo">
+              <h2 id="tipo-titulo">Desglose por tipo de daño</h2>
+              <dl className="metric-list">
+                {([...Object.entries(summary.pavimento.por_tipo), ['Encharcamiento', summary.encharcamientos.total]] as Array<[string, number]>).map(([key, value]) => {
+                  const total = summary.pavimento.total + summary.encharcamientos.total;
+                  return (
+                    <div key={key}>
+                      <dt><TypeBadge tipo={key as ReporteModeracionResumen['tipo_dano']} /></dt>
+                      <span className="metric-list__bar" aria-hidden="true"><span style={{ inlineSize: `${total ? (value / total) * 100 : 0}%` }} /></span>
+                      <dd className="tabular">{value}<small>{total ? ` · ${Math.round((value / total) * 100)} %` : ''}</small></dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              <p className="field-help">Encharcamientos intransitables en el periodo: <strong className="tabular">{summary.encharcamientos.intransitables}</strong>.</p>
+            </section>
+            <section className="panel" aria-labelledby="longevidad-titulo">
+              <h2 id="longevidad-titulo">Longevidad de baches abiertos</h2>
+              <p>Promedio de días sin reparar: <strong className="tabular">{summary.pavimento.longevidad_promedio_abiertos_dias.toFixed(1)}</strong> días. Los más antiguos:</p>
+              {longest.length ? (
+                <div className="admin-table-wrap admin-table-wrap--flat">
+                  <table className="admin-table admin-table--compact">
+                    <caption className="visually-hidden">Baches y alcantarillas abiertos con más días sin reparar</caption>
+                    <thead><tr><th scope="col">Folio</th><th scope="col">Ubicación</th><th scope="col">Estado</th><th scope="col" className="num">Longevidad</th></tr></thead>
+                    <tbody>{longest.map((item) => <tr key={item.folio}><th scope="row"><a className="tabular" href={`/reportes/${encodeURIComponent(item.folio)}`}>{item.folio}</a></th><td>{item.calle}<br /><small>{item.colonia.nombre}</small></td><td><StatusBadge estado={item.estado} /></td><td className="num tabular">{antiguedadTexto(item.longevidad_dias, item.created_at)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              ) : <EmptyState art="road" title="Sin baches abiertos">No hay baches ni alcantarillas pendientes de reparar.</EmptyState>}
+            </section>
             <section className="panel" aria-labelledby="zona-desempeno-titulo">
               <h2 id="zona-desempeno-titulo">Desempeño por zona</h2>
               {sectors.length ? (
@@ -192,9 +240,20 @@ export function DashboardPage() {
   );
 }
 
+const ESTADOS_AUDITADOS = ['Recibido', 'Validado', 'Programado', 'En reparación', 'Reparado', 'Rechazado'];
+
+async function cargarAuditoria(pagina: string): Promise<{ items: AuditoriaItem[]; total: number }> {
+  const response = await api.get<RespuestaPaginada<ReporteModeracionResumen>>(`/api/v1/moderacion/reportes?${ESTADOS_AUDITADOS.map((e) => `estado=${encodeURIComponent(e)}`).join('&')}&pagina=${pagina}&por_pagina=${PAGE_SIZE}`);
+  const details = await Promise.all(response.datos.map((item) => api.get<ReporteModeracionDetalle>(`/api/v1/moderacion/reportes/${encodeURIComponent(item.folio)}`)));
+  const items = details.flatMap((detail) => detail.historial.map((event) => ({ ...event, folio: detail.folio }))).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  return { items, total: response.paginacion.total_paginas || 1 };
+}
+
 export function AuditPage() {
-  const [page, setPage] = useState(1); const [items, setItems] = useState<AuditoriaItem[]>([]); const [total, setTotal] = useState(1); const [status, setStatus] = useState('cargando'); const [error, setError] = useState('');
-  useEffect(() => { let active = true; setStatus('cargando'); api.get<RespuestaPaginada<ReporteModeracionResumen>>(`/api/v1/moderacion/reportes?estado=Recibido&estado=Validado&estado=Programado&estado=En%20reparaci%C3%B3n&estado=Reparado&estado=Rechazado&pagina=${page}&por_pagina=${PAGE_SIZE}`).then(async (response) => { const details = await Promise.all(response.datos.map((item) => api.get<ReporteModeracionDetalle>(`/api/v1/moderacion/reportes/${encodeURIComponent(item.folio)}`))); const history = details.flatMap((detail) => detail.historial.map((event) => ({ ...event, folio: detail.folio }))).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()); if (active) { setItems(history); setTotal(response.paginacion.total_paginas || 1); setStatus('listo'); } }).catch((exception) => { if (active) { setError(exception instanceof ApiError ? exception.message : 'No fue posible cargar la auditoría.'); setStatus('error'); } }); return () => { active = false; }; }, [page]);
+  const [page, setPage] = useState(1);
+  const auditoria = useCargaDatos(String(page), cargarAuditoria, 'No fue posible cargar la auditoría.');
+  const status = auditoria.estado; const error = auditoria.error;
+  const items = auditoria.datos?.items ?? []; const total = auditoria.datos?.total ?? 1;
   return (
     <Guard roles={['coordinador']}>
       <main className="admin-page">

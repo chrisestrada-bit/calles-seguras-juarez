@@ -1,11 +1,26 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from '../components/Icon';
-import { BlockSkeleton, EmptyState, SeverityBadge, StatusBadge, TypeBadge, antiguedadTexto } from '../components/ui';
+import { BlockSkeleton, EmptyState, SeverityBadge, StatusBadge, TypeBadge } from '../components/ui';
+import { antiguedadTexto, fechaCalendario, fechaHora as fechaLarga } from '../utils/formato';
 import type { HistorialResponse, ReportePublico } from '../types/api';
 
-const fechaLarga = (valor: string) => new Date(valor).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+const siNo = (valor: boolean | null | undefined) => (valor ? 'Sí' : 'No');
+
+/** HU-04.4: datos específicos del daño según su tipo (formulario dinámico HU-02.2 / HU-03.1). */
+function datosDelDano(detalle: ReportePublico['detalle']): Array<{ etiqueta: string; valor: string }> {
+  if ('tamano' in detalle) return [
+    { etiqueta: 'Tamaño', valor: detalle.tamano },
+    { etiqueta: 'Profundidad', valor: detalle.profundidad },
+    { etiqueta: 'Carril afectado', valor: detalle.carril_afectado },
+  ];
+  if ('esta_senalizado' in detalle) return [{ etiqueta: '¿Está señalizada?', valor: siNo(detalle.esta_senalizado) }];
+  const filas: Array<{ etiqueta: string; valor: string }> = [{ etiqueta: 'Nivel del agua', valor: detalle.nivel_agua }];
+  if (detalle.hay_riesgo_personas_vehiculos !== null) filas.push({ etiqueta: 'Riesgo para personas o vehículos', valor: siNo(detalle.hay_riesgo_personas_vehiculos) });
+  return filas;
+}
+
 const ORIGEN: Record<string, { texto: string; icon: IconName }> = {
   ciudadano: { texto: 'Reporte ciudadano', icon: 'user' },
   moderacion: { texto: 'Actualización de moderación', icon: 'shield' },
@@ -38,14 +53,21 @@ export function ReportDetailPage({ folio }: { folio: string }) {
           <dl className="fact-grid">
             <div className="fact"><dt>Severidad</dt><dd><SeverityBadge severidad={reporte.severidad} intransitable={intransitable} /></dd></div>
             <div className="fact"><dt>Reportado</dt><dd><Icon name="calendar" size={16} />{fechaLarga(reporte.created_at)}</dd></div>
-            <div className="fact"><dt>Antigüedad</dt><dd><Icon name="clock" size={16} />{antiguedadTexto(reporte.longevidad_dias, reporte.created_at)}</dd></div>
+            <div className="fact"><dt>Longevidad</dt><dd><Icon name="clock" size={16} />{antiguedadTexto(reporte.longevidad_dias, reporte.created_at)}{reporte.estado === 'Reparado' ? ' hasta su reparación' : reporte.tipo_dano !== 'Encharcamiento' ? ' sin reparar' : ''}</dd></div>
+            <div className="fact"><dt>Sector</dt><dd><Icon name="layers" size={16} />{reporte.sector.nombre}</dd></div>
+            {datosDelDano(reporte.detalle).map((dato) => <div className="fact" key={dato.etiqueta}><dt>{dato.etiqueta}</dt><dd>{dato.valor}</dd></div>)}
+            {reporte.referencia && <div className="fact"><dt>Referencia</dt><dd><Icon name="pin" size={16} />{reporte.referencia}</dd></div>}
+            {reporte.fecha_programada && <div className="fact"><dt>Reparación programada</dt><dd><Icon name="calendar" size={16} />{fechaCalendario(reporte.fecha_programada)}</dd></div>}
+            {reporte.fecha_reparacion && <div className="fact"><dt>Fecha de reparación</dt><dd><Icon name="wrench" size={16} />{fechaCalendario(reporte.fecha_reparacion)}</dd></div>}
             {reporte.vigencia && <div className="fact"><dt>Confirmaciones</dt><dd className="fact__votes"><span><Icon name="thumbsUp" size={16} /><span className="tabular">{reporte.vigencia.sigue_ahi}</span> “sigue ahí”</span><span><Icon name="sun" size={16} /><span className="tabular">{reporte.vigencia.ya_no_hay_agua}</span> “ya no hay agua”</span></dd></div>}
           </dl>
 
-          <section className="detail-card__description" aria-labelledby="descripcion-titulo">
-            <h2 id="descripcion-titulo">Descripción</h2>
-            <p>{reporte.descripcion || 'Sin descripción adicional.'}</p>
-          </section>
+          {reporte.descripcion && (
+            <section className="detail-card__description" aria-labelledby="descripcion-titulo">
+              <h2 id="descripcion-titulo">Descripción</h2>
+              <p>{reporte.descripcion}</p>
+            </section>
+          )}
 
           {puedeConfirmar && (
             <section className="confirmation-panel" aria-labelledby="confirmaciones-titulo">

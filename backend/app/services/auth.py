@@ -30,6 +30,7 @@ def registrar(db: Session, datos: RegistroIn) -> Usuario:
         correo=correo,
         password_hash=hashear_contrasena(datos.contrasena),
         rol=RolUsuario.CIUDADANO,  # el cliente nunca elige su rol
+        aviso_privacidad_aceptado_at=ahora_utc(),  # HU-01.2: constancia del consentimiento
     )
     db.add(usuario)
     try:

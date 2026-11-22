@@ -76,6 +76,27 @@ class EncharcamientoIn(_ReporteBase):
 ReporteCrear = Annotated[BacheIn | AlcantarillaIn | EncharcamientoIn, Field(discriminator="tipo_dano")]
 
 
+class ReporteEditar(Esquema):
+    """HU-02.5: el autor corrige su reporte mientras está «Recibido».
+
+    Folio, tipo, ubicación y fecha son inmutables (RN-03, RN-10); la severidad la recalcula el servidor.
+    """
+
+    colonia_id: int | None = Field(default=None, ge=1)
+    calle: str | None = Field(default=None, min_length=3, max_length=150)
+    referencia: str | None = Field(default=None, max_length=200)
+    descripcion: str | None = Field(default=None, max_length=500)  # HU-02.2: máximo 500
+    tamano: TamanoBache | None = None
+    profundidad: ProfundidadBache | None = None
+    carril_afectado: CarrilAfectado | None = None
+    esta_senalizado: bool | None = None
+
+    @field_validator("referencia", "descripcion")
+    @classmethod
+    def _vacio_a_nulo(cls, valor: str | None) -> str | None:
+        return valor or None
+
+
 class ConfirmacionIn(Esquema):
     tipo: TipoConfirmacion
 

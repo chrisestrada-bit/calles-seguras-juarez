@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { Icon } from './Icon';
 
 export function Guard({ roles, children }: { roles: string[]; children: ReactNode }) {

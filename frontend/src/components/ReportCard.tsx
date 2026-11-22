@@ -1,8 +1,10 @@
 import type { ReporteResumenPublico } from '../types/api';
 import { Icon } from './Icon';
-import { SeverityBadge, StatusBadge, TypeBadge, antiguedadTexto, tonoDeTipo } from './ui';
+import { SeverityBadge, StatusBadge, TypeBadge } from './ui';
+import { antiguedadTexto, distanciaTexto, tonoDeTipo } from '../utils/formato';
 
-export function ReportCard({ reporte }: { reporte: ReporteResumenPublico }) {
+/** `distanciaMetros` sólo se pasa en «¿Cómo está mi zona?» (HU-04.3). */
+export function ReportCard({ reporte, distanciaMetros }: { reporte: ReporteResumenPublico; distanciaMetros?: number }) {
   const encharcamiento = reporte.tipo_dano === 'Encharcamiento';
   const intransitable = encharcamiento && reporte.nivel_agua?.toLowerCase() === 'intransitable';
   const href = `/reportes/${reporte.folio}`;
@@ -15,6 +17,8 @@ export function ReportCard({ reporte }: { reporte: ReporteResumenPublico }) {
       <div className="report-card__place">
         <h3 className="report-card__street"><a href={href} className="report-card__link">{reporte.calle}</a></h3>
         <p className="report-card__colonia"><Icon name="pin" size={16} />{reporte.colonia?.nombre ?? 'Colonia sin registrar'}</p>
+        {distanciaMetros !== undefined && <p className="report-card__colonia"><Icon name="locate" size={16} /><span><span className="visually-hidden">Distancia: </span>a <span className="tabular">{distanciaTexto(distanciaMetros)}</span></span></p>}
+        {encharcamiento && reporte.nivel_agua && !intransitable && <p className="report-card__colonia"><Icon name="water" size={16} />Nivel del agua: {reporte.nivel_agua}</p>}
         <p className="report-card__folio">Folio <span className="tabular">{reporte.folio}</span></p>
       </div>
       {encharcamiento && reporte.vigencia && (
