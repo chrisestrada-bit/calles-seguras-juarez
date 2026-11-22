@@ -2,6 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../services/api';
 import { ReportCard } from '../components/ReportCard';
 import { ZoneSection } from '../components/ZoneSection';
+import { Pagination } from '../components/AdminShared';
+import { Icon } from '../components/Icon';
+import { EmptyState, ReportGridSkeleton, TypeGlyph } from '../components/ui';
+import { HeroMap } from '../components/HeroMap';
 import type { ReporteResumenPublico, ReportePublico, RespuestaPaginada, TipoDano, EstadoReporte } from '../types/api';
 
 const tipos: TipoDano[] = ['Bache', 'Alcantarilla sin tapa', 'Encharcamiento'];
@@ -13,5 +17,68 @@ export function PublicHomePage() {
   useEffect(() => { void cargar(); }, [pagina, tipo, estado]);
   const buscar = (evento: FormEvent) => { evento.preventDefault(); setPagina(1); void cargar(evento); };
   const filtrados = busqueda.trim() ? reportes.filter((r) => `${r.folio} ${r.calle}`.toLocaleLowerCase().includes(busqueda.toLocaleLowerCase())) : reportes;
-  return <main className="public-page"><section className="hero-section"><div><p className="eyebrow">Ciudad Juárez, Chihuahua</p><h1>Consulta y reporta el estado de tus calles</h1><p>Encuentra baches y encharcamientos antes de salir. La información pública nunca muestra datos del autor.</p></div><span className="hero-icon" aria-hidden="true">🛣️</span></section><section className="filters-section" aria-labelledby="filtros-titulo"><h2 id="filtros-titulo">Buscar reportes</h2><form className="filters" onSubmit={buscar}><label htmlFor="busqueda">Calle o folio</label><input id="busqueda" placeholder="Ej. Tecnológico o BCH-2026-000418" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /><label htmlFor="tipo">Tipo de daño</label><select id="tipo" value={tipo} onChange={(e) => { setTipo(e.target.value); setPagina(1); }}><option value="">Todos</option>{tipos.map((t) => <option key={t}>{t}</option>)}</select><label htmlFor="estado">Estado</label><select id="estado" value={estado} onChange={(e) => { setEstado(e.target.value); setPagina(1); }}><option value="">Todos</option>{estados.map((e) => <option key={e}>{e}</option>)}</select><button className="button" type="submit">Buscar</button></form></section><ZoneSection /><section aria-labelledby="reportes-titulo"><div className="section-heading"><h2 id="reportes-titulo">Reportes recientes</h2><div className="legend"><span>🕳️ Bache o alcantarilla</span><span>🌊 Encharcamiento</span></div></div>{cargando ? <p className="state-message" role="status">Cargando reportes…</p> : error ? <div className="form-error" role="alert">{error}</div> : filtrados.length === 0 ? <p className="state-message">No hay reportes que coincidan con tus filtros.</p> : <div className="report-grid">{filtrados.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>}<nav className="pagination" aria-label="Paginación de reportes"><button type="button" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>Anterior</button><span>Página {pagina} de {totalPaginas}</span><button type="button" disabled={pagina >= totalPaginas} onClick={() => setPagina((p) => p + 1)}>Siguiente</button></nav></section></main>;
+  const hayFiltros = Boolean(busqueda.trim() || tipo || estado);
+
+  return (
+    <main className="public-page">
+      <section className="hero" aria-labelledby="hero-titulo">
+        <HeroMap />
+        <div className="hero__content">
+          <h1 id="hero-titulo" className="reveal">Consulta y reporta el estado de tus calles</h1>
+          <p className="hero__lead reveal reveal--2">Encuentra baches y encharcamientos antes de salir. La información pública nunca muestra datos del autor.</p>
+          <p className="hero__place reveal reveal--3"><span className="hero__live" aria-hidden="true" />Ciudad Juárez, Chihuahua</p>
+          <div className="hero__actions reveal reveal--4">
+            <a className="button button--accent button--lg" href="#zona-titulo"><Icon name="locate" size={20} />Revisar mi zona</a>
+            <a className="button button--ghost-light button--lg" href="/reportar"><Icon name="plus" size={20} />Reportar un daño</a>
+          </div>
+        </div>
+        <p className="hero__map-note">Mapa ilustrativo de Ciudad Juárez</p>
+        <ul className="hero__legend reveal reveal--4" aria-label="Qué puedes reportar">
+          <li className="hero__chip hero__chip--road"><TypeGlyph tipo="Bache" size={20} />Bache</li>
+          <li className="hero__chip hero__chip--manhole"><TypeGlyph tipo="Alcantarilla sin tapa" size={20} />Alcantarilla sin tapa</li>
+          <li className="hero__chip hero__chip--water"><TypeGlyph tipo="Encharcamiento" size={20} />Encharcamiento</li>
+        </ul>
+      </section>
+
+      <ZoneSection />
+
+      <section className="reports-section" aria-labelledby="reportes-titulo">
+        <div className="section-heading">
+          <div>
+            <h2 id="reportes-titulo">Reportes recientes</h2>
+            <p className="section-heading__sub">Busca por calle o folio y filtra por tipo o estado.</p>
+          </div>
+          <ul className="legend" aria-label="Simbología">
+            <li className="legend__item legend__item--road"><TypeGlyph tipo="Bache" size={18} />Bache</li>
+            <li className="legend__item legend__item--manhole"><TypeGlyph tipo="Alcantarilla sin tapa" size={18} />Alcantarilla</li>
+            <li className="legend__item legend__item--water"><TypeGlyph tipo="Encharcamiento" size={18} />Encharcamiento</li>
+          </ul>
+        </div>
+
+        <section className="filter-bar" aria-labelledby="filtros-titulo">
+          <h3 id="filtros-titulo" className="visually-hidden">Buscar reportes</h3>
+          <form className="filters" onSubmit={buscar}>
+            <div className="field field--search">
+              <label htmlFor="busqueda">Calle o folio</label>
+              <div className="input-icon"><Icon name="search" size={18} /><input id="busqueda" placeholder="Ej. Tecnológico o BCH-2026-000418" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
+            </div>
+            <div className="field">
+              <label htmlFor="tipo">Tipo de daño</label>
+              <select id="tipo" value={tipo} onChange={(e) => { setTipo(e.target.value); setPagina(1); }}><option value="">Todos</option>{tipos.map((t) => <option key={t}>{t}</option>)}</select>
+            </div>
+            <div className="field">
+              <label htmlFor="estado">Estado</label>
+              <select id="estado" value={estado} onChange={(e) => { setEstado(e.target.value); setPagina(1); }}><option value="">Todos</option>{estados.map((e) => <option key={e}>{e}</option>)}</select>
+            </div>
+            <button className="button button--primary" type="submit"><Icon name="search" size={18} />Buscar</button>
+          </form>
+        </section>
+
+        {cargando ? <ReportGridSkeleton count={6} /> : error ? <div className="form-error" role="alert">{error}</div> : filtrados.length === 0
+          ? <EmptyState art="search" title="No hay reportes que coincidan con tus filtros" action={<a className="button button--primary" href="/reportar"><Icon name="plus" size={18} />Reportar un daño</a>}>{hayFiltros ? 'Prueba con otra calle, otro tipo de daño o quita el filtro de estado.' : 'Aún no hay reportes públicos. Sé la primera persona en reportar un daño.'}</EmptyState>
+          : <div className="report-grid">{filtrados.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>}
+        <Pagination page={pagina} total={totalPaginas} onChange={setPagina} label="Paginación de reportes" />
+      </section>
+    </main>
+  );
 }

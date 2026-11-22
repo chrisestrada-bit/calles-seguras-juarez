@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../services/api';
-import { ErrorMessage, Guard, Pagination } from '../components/AdminShared';
+import { ErrorMessage, Guard, PageIntro, Pagination } from '../components/AdminShared';
+import { Icon } from '../components/Icon';
+import { EmptyState, TableSkeleton } from '../components/ui';
 import type { Colonia, ColoniaRequest, ColoniaUpdate, RespuestaPaginada, SectorAdmin } from '../types/api';
 
 const POR_PAGINA = 20;
@@ -43,7 +45,7 @@ function ColoniaForm({ sectores, editando, onCancel, onSaved }: { sectores: Sect
   };
 
   return (
-    <form className="detail-card admin-form" onSubmit={enviar} aria-labelledby="colonia-form-titulo">
+    <form className="panel admin-form" onSubmit={enviar} aria-labelledby="colonia-form-titulo">
       <h2 id="colonia-form-titulo">{editando ? `Editar colonia: ${editando.nombre}` : 'Nueva colonia'}</h2>
       {error && <ErrorMessage message={error} />}
       <label htmlFor="col-nombre">Nombre</label>
@@ -60,7 +62,7 @@ function ColoniaForm({ sectores, editando, onCancel, onSaved }: { sectores: Sect
       <label htmlFor="col-lng">Longitud del centro</label>
       <input id="col-lng" required inputMode="decimal" value={valores.longitud_centro} onChange={(e) => cambiar('longitud_centro', e.target.value)} />
       <div className="confirmation-actions">
-        <button className="button" type="submit" disabled={ocupado}>{ocupado ? 'Guardando…' : 'Guardar'}</button>
+        <button className="button button--primary" type="submit" disabled={ocupado}>{ocupado ? 'Guardando…' : 'Guardar'}</button>
         <button className="button button--secondary" type="button" onClick={onCancel} disabled={ocupado}>Cancelar</button>
       </div>
     </form>
@@ -136,31 +138,30 @@ export function AdminColoniasPage() {
   return (
     <Guard roles={['coordinador']}>
       <main className="admin-page">
-        <header className="admin-intro">
-          <p className="eyebrow">Catálogos · coordinación</p>
-          <h1>Administración de colonias</h1>
-          <p>Crea, edita y desactiva colonias. Las colonias no se eliminan para conservar la integridad de los reportes históricos.</p>
-        </header>
-        <section className="filters-section" aria-labelledby="colonias-filtros">
-          <h2 id="colonias-filtros">Buscar colonias</h2>
-          <form className="filters" onSubmit={buscar}>
-            <label htmlFor="colonias-q">Nombre (mínimo 2 caracteres)</label>
-            <input id="colonias-q" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-            <label htmlFor="colonias-sector">Sector</label>
-            <select id="colonias-sector" value={sector} onChange={(e) => { setSector(e.target.value); setPagina(1); }}>
-              <option value="">Todos los sectores</option>
-              {sectores.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-            </select>
-            <button className="button" type="submit">Buscar</button>
+        <PageIntro title="Administración de colonias" actions={<button className="button button--primary" type="button" onClick={() => setFormulario({ editando: null })}><Icon name="plus" size={18} />Nueva colonia</button>}>Crea, edita y desactiva colonias. Las colonias no se eliminan para conservar la integridad de los reportes históricos.</PageIntro>
+        <section className="filter-bar" aria-labelledby="colonias-filtros">
+          <h2 id="colonias-filtros" className="visually-hidden">Buscar colonias</h2>
+          <form className="filters filters--three" onSubmit={buscar}>
+            <div className="field field--search">
+              <label htmlFor="colonias-q">Nombre (mínimo 2 caracteres)</label>
+              <div className="input-icon"><Icon name="search" size={18} /><input id="colonias-q" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
+            </div>
+            <div className="field">
+              <label htmlFor="colonias-sector">Sector</label>
+              <select id="colonias-sector" value={sector} onChange={(e) => { setSector(e.target.value); setPagina(1); }}>
+                <option value="">Todos los sectores</option>
+                {sectores.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              </select>
+            </div>
+            <button className="button button--primary" type="submit"><Icon name="search" size={18} />Buscar</button>
           </form>
-          <button className="button button--secondary" type="button" onClick={() => setFormulario({ editando: null })}>Nueva colonia</button>
         </section>
         {formulario && <ColoniaForm key={formulario.editando?.id ?? 'nueva'} sectores={sectores} editando={formulario.editando} onCancel={() => setFormulario(null)} onSaved={alGuardar} />}
         {mensaje && <div className="form-success" role="status">{mensaje}</div>}
         {errorAccion && <ErrorMessage message={errorAccion} />}
-        {estado === 'cargando' && <p className="state-message" role="status">Cargando colonias…</p>}
+        {estado === 'cargando' && <TableSkeleton label="Cargando colonias…" />}
         {estado === 'error' && <ErrorMessage message={error} />}
-        {estado === 'listo' && filas.length === 0 && <p className="state-message">No hay colonias que coincidan con la búsqueda.</p>}
+        {estado === 'listo' && filas.length === 0 && <EmptyState art="search" title="Sin coincidencias" action={<button className="button button--primary" type="button" onClick={() => setFormulario({ editando: null })}><Icon name="plus" size={18} />Nueva colonia</button>}>No hay colonias que coincidan con la búsqueda.</EmptyState>}
         {estado === 'listo' && filas.length > 0 && (
           <>
             <div className="admin-table-wrap">
@@ -173,11 +174,11 @@ export function AdminColoniasPage() {
                       <th scope="row">{c.nombre}</th>
                       <td>{c.sector.nombre}</td>
                       <td>{c.codigo_postal ?? '—'}</td>
-                      <td>{c.activo ? '✔ Activa' : '⛔ Inactiva'}</td>
+                      <td>{c.activo ? <span className="status-badge status-badge--success"><Icon name="checkCircle" size={15} />Activa</span> : <span className="status-badge status-badge--neutral"><Icon name="ban" size={15} />Inactiva</span>}</td>
                       <td>
-                        <div className="confirmation-actions">
-                          <button className="button button--secondary" type="button" onClick={() => setFormulario({ editando: c })}>Editar<span className="visually-hidden"> {c.nombre}</span></button>
-                          <button className="button" type="button" disabled={cambiando === c.id} onClick={() => void alternar(c)}>{c.activo ? 'Desactivar' : 'Reactivar'}<span className="visually-hidden"> {c.nombre}</span></button>
+                        <div className="row-actions">
+                          <button className="button button--secondary button--sm" type="button" onClick={() => setFormulario({ editando: c })}><Icon name="edit" size={16} />Editar<span className="visually-hidden"> {c.nombre}</span></button>
+                          <button className={`button button--sm ${c.activo ? 'button--quiet' : 'button--primary'}`} type="button" disabled={cambiando === c.id} onClick={() => void alternar(c)}>{c.activo ? 'Desactivar' : 'Reactivar'}<span className="visually-hidden"> {c.nombre}</span></button>
                         </div>
                       </td>
                     </tr>
