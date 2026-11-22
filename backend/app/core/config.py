@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     # Tras un fallo del proveedor no se reintenta durante este lapso (se sirve la caché, aunque esté vencida).
     weather_backoff_minutes: int = 5
     weather_timeout_seconds: float = 5
+    # Open-Meteo limita o rechaza clientes anónimos desde nubes compartidas (Render): se identifica la app (D-10).
+    weather_user_agent: str = "CallesSegurasJuarez/1.0 (+https://calles-seguras-juarez.onrender.com)"
 
     # Sólo backend: la llave nunca se envía al frontend ni se registra en logs.
     geocoding_api_url: str = "https://us1.locationiq.com/v1"
