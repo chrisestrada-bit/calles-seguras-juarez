@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest + PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        # Credenciales efímeras del contenedor de CI: no son secretos ni existen fuera de este job.
+        env:
+          POSTGRES_DB: calles_seguras_test
+          POSTGRES_USER: csj_ci
+          POSTGRES_PASSWORD: csj_ci_local
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U csj_ci -d calles_seguras_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      # Las pruebas de integración sólo corren contra una base cuyo nombre termina en _test (conftest.py).
+      DATABASE_URL: postgresql+psycopg://csj_ci:csj_ci_local@127.0.0.1:5432/calles_seguras_test
+      APP_ENV: test
+      JWT_SECRET_KEY: clave-de-pruebas-ci-no-secreta-1234567890
+      SEED_PASSWORD: PruebasCi2026
+      FRONTEND_URL: http://localhost:5173
+      # Las pruebas sustituyen al proveedor de geocodificación; sin llave se usa el catálogo local.
+      GEOCODING_API_KEY: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Aplicar migraciones
+        run: alembic -c db/alembic.ini upgrade head
+
+      - name: Cargar datos semilla
+        run: python db/seed.py
+
+      - name: Ejecutar pruebas
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest backend/tests -q -rs | tee pytest.log
+          # conftest.py omite las pruebas si no hay PostgreSQL: en CI eso debe fallar, no pasar en verde.
+          if grep -q "skipped" pytest.log; then
+            echo "::error::Se omitieron pruebas; revisa la conexión a PostgreSQL."
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+        run: npm run build

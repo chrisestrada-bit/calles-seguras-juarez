@@ -1,4 +1,4 @@
-# Calles Seguras Juárez — API + PostgreSQL con un solo comando:
+# Calles Seguras Juárez — PostgreSQL + API + frontend con un solo comando:
 #
 #   docker compose up --build
 #
@@ -42,6 +42,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-valor-ficticio-solo-desarrollo-reemplazar-en-produccion}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      # Único origen permitido por CORS: debe coincidir con el puerto publicado del servicio frontend.
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       WEATHER_API_URL: ${WEATHER_API_URL:-https://api.open-meteo.com/v1/forecast}
       WEATHER_CACHE_TTL_MINUTES: ${WEATHER_CACHE_TTL_MINUTES:-30}
@@ -69,6 +70,21 @@ services:
       timeout: 5s
       retries: 6
       start_period: 40s
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+      args:
+        # El navegador llama a la API desde la máquina anfitriona, por eso es localhost y no `backend`.
+        # Sin /api/v1: el cliente ya lo antepone a cada ruta.
+        VITE_API_BASE_URL: http://localhost:${BACKEND_PORT:-8000}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
 
 volumes:
   pgdata:
