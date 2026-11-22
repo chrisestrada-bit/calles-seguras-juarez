@@ -25,7 +25,7 @@ export interface ReportePublico {
   folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad;
   ubicacion: Ubicacion; calle: string; referencia: string | null; colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo;
   descripcion: string; detalle: DetalleReporte; confirmaciones: number; created_at: string; fecha_programada: string | null;
-  fecha_reparacion: string | null; longevidad_dias: number | null; vigencia: Vigencia | null;
+  fecha_reparacion: string | null; longevidad_dias: number | null; vigencia: Vigencia | null; es_mio?: boolean; ya_confirmado_por_mi?: boolean;
 }
 export interface ReporteResumenPublico {
   folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad;
@@ -46,9 +46,9 @@ export interface LoginRequest { correo: string; contrasena: string; }
 export interface LoginResponse { access_token: string; token_type: 'bearer'; expira_en_segundos: number; usuario: UsuarioResumen; }
 export interface UsuarioYo extends UsuarioResumen { correo: string; reportes_ultima_hora: number; limite_reportes_hora: number; }
 
-export interface ReporteBacheRequest { tipo_dano: 'Bache'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion: string; tamano: Tamano; profundidad: Profundidad; carril_afectado: CarrilAfectado; forzar_nuevo: boolean; }
-export interface ReporteAlcantarillaRequest { tipo_dano: 'Alcantarilla sin tapa'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion: string; esta_senalizado: boolean; forzar_nuevo: boolean; }
-export interface ReporteEncharcamientoRequest { tipo_dano: 'Encharcamiento'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; nivel_agua: NivelAgua; hay_riesgo_personas_vehiculos?: boolean; forzar_nuevo: boolean; }
+export interface ReporteBacheRequest { tipo_dano: 'Bache'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; tamano: Tamano; profundidad: Profundidad; carril_afectado: CarrilAfectado; forzar_nuevo: boolean; }
+export interface ReporteAlcantarillaRequest { tipo_dano: 'Alcantarilla sin tapa'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; esta_senalizado: boolean; forzar_nuevo: boolean; }
+export interface ReporteEncharcamientoRequest { tipo_dano: 'Encharcamiento'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; nivel_agua: NivelAgua; hay_riesgo_personas_vehiculos?: boolean; forzar_nuevo: boolean; }
 export type CrearReporteRequest = ReporteBacheRequest | ReporteAlcantarillaRequest | ReporteEncharcamientoRequest;
 export interface ReporteAutenticado extends ReportePublico { es_mio: boolean; ya_confirmado_por_mi?: boolean; }
 export interface CandidatoCercano { folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad; calle: string; distancia_metros: number; confirmaciones: number; ya_confirmado_por_mi: boolean; es_mio: boolean; created_at: string; }
@@ -93,3 +93,4 @@ export interface RiesgoCalle { calle: string; colonia: ReferenciaCatalogo; secto
 export interface RiesgoInundacionResponse { alerta_lluvia: boolean; datos: RiesgoCalle[]; criterio: string; obtenido_en: string; }
 export interface GeocodingResultado { etiqueta: string; calle: string | null; ubicacion: Ubicacion; precision: 'direccion' | 'calle' | 'colonia' | 'aproximada'; colonia_sugerida: (ReferenciaCatalogo & { sector: ReferenciaCatalogo }) | null; }
 export interface GeocodingResponse { fuente: 'locationiq' | 'catalogo_local'; degradado: boolean; datos: GeocodingResultado[]; atribucion: string | null; mensaje: string | null; }
+export interface ColoniasResponse { datos: Colonia[]; paginacion: Paginacion; }
