@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { PronosticoResponse } from '../types/api';
+import { fechaHora } from '../utils/formato';
 import { Icon } from './Icon';
 
 /** Ícono climático animado (nube con lluvia o sol); decorativo, el texto lleva la información. */
@@ -70,6 +71,12 @@ export function RainBanner() {
               ? pronostico.mensaje_alerta ?? 'Se esperan lluvias. Consulta las calles con riesgo de inundación antes de salir.'
               : <>{actual?.descripcion ? `${actual.descripcion.charAt(0).toUpperCase()}${actual.descripcion.slice(1)}` : 'Condiciones estables'}{maxProb !== null && <> · Probabilidad de lluvia en las próximas horas: <span className="tabular">{Math.round(maxProb)} %</span></>}</>}
           </p>
+          {pronostico.obtenido_en && (
+            <p className="rain-banner__meta">
+              Actualizado: <time dateTime={pronostico.obtenido_en}>{fechaHora(pronostico.obtenido_en)} (hora de Ciudad Juárez)</time>
+              {pronostico.desactualizado && ' · Mostrando datos guardados porque el proveedor del clima no está disponible temporalmente.'}
+            </p>
+          )}
         </div>
         {lluvia && <a className="rain-banner__link" href="/?zona=riesgo">Ver calles en riesgo <Icon name="arrowRight" size={16} /></a>}
       </div>

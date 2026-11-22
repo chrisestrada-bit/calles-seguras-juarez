@@ -49,7 +49,9 @@ def _consultar_proveedor() -> dict[str, Any]:
             "forecast_days": 2,
             "timezone": "UTC",
         },
+        headers={"User-Agent": s.weather_user_agent, "Accept": "application/json"},
         timeout=s.weather_timeout_seconds,
+        follow_redirects=True,
     )
     respuesta.raise_for_status()
     crudo = respuesta.json()
@@ -122,6 +124,11 @@ def obtener_pronostico(db: Session) -> dict[str, Any]:
     s = get_settings()
     ahora = ahora_utc()
     cache = db.scalar(select(CacheClima).where(CacheClima.clave_consulta == CLAVE_CONSULTA))
+    if cache is not None:  # RN-02: las columnas son UTC; si llegaran ingenuas, se asume UTC para poder restar/comparar
+        for campo in ("obtenido_at", "expira_at"):
+            valor = getattr(cache, campo)
+            if valor.tzinfo is None:
+                setattr(cache, campo, valor.replace(tzinfo=timezone.utc))
     if cache is not None and cache.expira_at > ahora:
         return _armar(cache.respuesta, cache.obtenido_at, False)
 
@@ -133,7 +140,8 @@ def obtener_pronostico(db: Session) -> dict[str, Any]:
         normalizada = _consultar_proveedor()
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         # Sólo el tipo de error: el mensaje de httpx puede incluir la URL completa.
-        logger.warning("Proveedor de clima no disponible (%s)", type(exc).__name__)
+        estado_http = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else "-"
+        logger.warning("Proveedor de clima no disponible (%s, HTTP %s)", type(exc).__name__, estado_http)
         _sin_reintentos_hasta = ahora + timedelta(minutes=s.weather_backoff_minutes)
         return _degradado(cache)
     _sin_reintentos_hasta = None
