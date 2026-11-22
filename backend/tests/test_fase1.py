@@ -217,7 +217,7 @@ def test_csv_con_bom_columnas_filtros_y_sin_pii(client, ciudadano, moderador):
     assert len(filas) == 2 and filas[1][0] == rep["folio"] and filas[1][2] == "Calle Peña Nieto"
     assert filas[1][4] == "Recibido"
     assert ciudadano.correo not in r.text and ciudadano.id not in r.text
-    vacio = client.get(f"{API}/reportes/exportar/csv", params={"bbox": "-106.64,31.46,-106.6399,31.4601"}, headers=moderador.h)
+    vacio = client.get(f"{API}/reportes/exportar/csv", params={"desde": "2099-01-01"}, headers=moderador.h)
     assert len(list(csv.reader(io.StringIO(vacio.content.decode("utf-8-sig"))))) == 1  # sólo encabezado
 
 
@@ -251,7 +251,7 @@ def test_xml_valido_contra_xsd_con_acentos_y_vacio(client, ciudadano, moderador)
     assert raiz.get("total") == "1" and raiz.get("zona_horaria") == "America/Ciudad_Juarez"
     assert raiz.find("r:reporte/r:ubicacion", ns).text == "Av. Niños Héroes & <Ñandú>"
     assert ciudadano.correo.encode() not in r.content
-    vacio = client.get(f"{API}/reportes/exportar/xml", params={"bbox": "-106.64,31.46,-106.6399,31.4601"}, headers=moderador.h)
+    vacio = client.get(f"{API}/reportes/exportar/xml", params={"desde": "2099-01-01"}, headers=moderador.h)
     assert exportacion.cargar_esquema("reportes_v1.xsd").validate(etree.fromstring(vacio.content))
     assert etree.fromstring(vacio.content).get("total") == "0"
 

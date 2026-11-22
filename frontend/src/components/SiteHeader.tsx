@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from './Icon';
 import { ThemeToggle } from './ThemeToggle';
+import { CampanaNotificaciones } from './CampanaNotificaciones';
+import { InstalarApp } from './InstalarApp';
 
 type Enlace = { href: string; texto: string; icon: IconName };
 
@@ -48,6 +50,7 @@ export function SiteHeader() {
     ...(rol === 'moderador' || rol === 'coordinador' ? [{ href: '/moderacion', texto: 'Moderación', icon: 'shield' as IconName }] : []),
     ...(rol === 'coordinador' ? [
       { href: '/coordinacion', texto: 'Coordinación', icon: 'wrench' as IconName },
+      { href: '/puntos-recurrentes', texto: 'Puntos recurrentes', icon: 'repeat' as IconName },
       { href: '/admin/colonias', texto: 'Colonias', icon: 'pin' as IconName },
       { href: '/admin/usuarios', texto: 'Usuarios', icon: 'user' as IconName },
     ] : []),
@@ -59,6 +62,8 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="site-header__inner">
         <Marca />
+        <InstalarApp />
+        {autenticado && <CampanaNotificaciones />}
         <ThemeToggle />
         <button className="menu-toggle" type="button" aria-expanded={abierto} aria-controls="menu-principal" onClick={() => setAbierto((v) => !v)}>
           <Icon name={abierto ? 'close' : 'menu'} size={22} /><span>{abierto ? 'Cerrar' : 'Menú'}</span>

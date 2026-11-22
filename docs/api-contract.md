@@ -1422,3 +1422,47 @@ Sólo `coordinador`. `multipart/form-data` con el campo `archivo` (XML ≤ 2 MB 
 | `401` / `403` | Sin sesión / rol distinto de coordinador. |
 | `413` | Archivo mayor de 2 MB. |
 | `422 XML_INVALIDO` | Vacío, mal formado, con `DOCTYPE`, fuera del XSD o con integridad referencial rota. `detalles[]` trae `linea`, `campo` y `mensaje`. No se importa nada. |
+
+---
+
+## 11. Extensiones opcionales · Fase 2
+
+### 11.1 Recurrencia en `ReporteResumenPublico` y `ReportePublico` (HU-03.4)
+
+Sólo en encharcamientos (en pavimento los tres campos son `null`):
+
+```json
+{ "es_punto_recurrente": true, "dias_distintos_anio": 4, "ultima_ocurrencia": "2026-11-20T18:05:00-07:00" }
+```
+
+### 11.2 `GET /api/v1/indicadores/puntos-recurrentes` (HU-03.4, sólo `coordinador`)
+
+`401` sin sesión, `403` para otros roles. Respuesta: `{ anio, radio_metros: 50, minimo_dias: 3, datos: [{ ubicacion, calle, colonia, dias_distintos_anio, total_reportes, ultima_ocurrencia, folios }] }`.
+
+### 11.3 Notificaciones (HU-08.2) · `GET /api/v1/notificaciones`, `PATCH /api/v1/notificaciones/{id}/leer`, `PATCH /api/v1/notificaciones/leer-todas`
+
+Todas requieren sesión (`401`) y operan **sólo sobre los avisos de quien las llama**.
+
+| Ruta | Respuesta |
+|------|-----------|
+| `GET /notificaciones?solo_no_leidas=&pagina=&por_pagina=` | `{ datos: [{ id, folio, mensaje, leida, created_at }], paginacion, no_leidas }` (más recientes primero). |
+| `PATCH /notificaciones/{id}/leer` | `200` con el aviso en `leida: true`; **`404`** si es de otra persona o no existe. |
+| `PATCH /notificaciones/leer-todas` | `{ marcadas, no_leidas: 0, mensaje }`. |
+
+### 11.4 WebSocket `GET /api/v1/ws/encharcamientos` (HU-08.3 · extra 4.5)
+
+Protocolo y garantías en `arquitectura.md` §11.3. Mensajes del servidor (JSON):
+
+```json
+{ "tipo": "hola", "heartbeat_segundos": 20 }
+{ "tipo": "ping" }
+{ "tipo": "encharcamiento.creado", "event_id": "7d0c…", "folio": "ENC-2026-000210", "emitido_en": "2026-11-22T17:02:11-07:00", "reporte": { "...ReporteResumenPublico..." } }
+{ "tipo": "encharcamiento.actualizado", "event_id": "…", "folio": "ENC-2026-000210", "emitido_en": "…", "reporte": { "...": "…" } }
+{ "tipo": "encharcamiento.retirado", "event_id": "…", "folio": "ENC-2026-000210", "emitido_en": "…", "reporte": null }
+```
+
+El cliente responde `{"tipo":"pong"}` a cada `ping`. Un `Origin` distinto de `FRONTEND_URL` se cierra con el código 1008. Los eventos no contienen autor, correo ni identificadores internos.
+
+### 11.5 `POST /api/v1/reportes` con `idempotency_key` (HU-08.4)
+
+Campo opcional `idempotency_key` (UUID) en el cuerpo de cualquiera de los tres tipos. Primera vez: `201`. Reenvío con la misma llave de la misma persona: **`200`** con el mismo reporte (mismo folio), sin crear otro ni consumir el límite de 10/hora. Llaves iguales de personas distintas no se relacionan. Una llave que no es UUID responde `422`. La llave nunca aparece en las respuestas.

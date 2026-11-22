@@ -193,3 +193,12 @@ export function AuthArt() {
     </svg>
   );
 }
+
+/** HU-03.4: insignia accesible (ícono + texto + días); el color nunca es el único indicador. */
+export function RecurrentBadge({ dias }: { dias?: number | null }) {
+  return (
+    <span className="badge-recurrente" title={dias ? `Se ha reportado en ${dias} días distintos este año` : undefined}>
+      <Icon name="repeat" size={14} />Punto recurrente{dias ? <span className="visually-hidden"> ({dias} días distintos este año)</span> : null}
+    </span>
+  );
+}

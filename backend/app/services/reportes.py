@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 from sqlalchemy import Float, case, func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errores import ErrorAPI, fuera_de_juarez
@@ -138,7 +139,18 @@ def _verificar_limite_por_hora(db: Session, usuario: Usuario) -> None:
 # --------------------------------------------------------------------------- creación
 
 
+def _por_clave(db: Session, usuario: Usuario, clave) -> Reporte | None:
+    if clave is None:
+        return None
+    return db.scalar(select(Reporte).where(Reporte.usuario_id == usuario.id, Reporte.idempotency_key == clave))
+
+
 def crear_reporte(db: Session, usuario: Usuario, payload: ReporteCrear) -> Reporte:
+    # HU-08.4: reenviar el mismo borrador offline devuelve el reporte ya creado (sin folio nuevo ni tope RN-08).
+    previo = _por_clave(db, usuario, payload.idempotency_key)
+    if previo is not None:
+        previo._reutilizado = True  # type: ignore[attr-defined]
+        return previo
     tipo = TipoDano(payload.tipo_dano)
     verificar_territorio(payload.latitud, payload.longitud)  # RN-01 (defensa en profundidad)
 
@@ -193,13 +205,22 @@ def crear_reporte(db: Session, usuario: Usuario, payload: ReporteCrear) -> Repor
         vigente_hasta=creado + VIGENCIA if es_enc else None,
         ciclo_vigencia=0,
         forzado_como_nuevo=payload.forzar_nuevo,
+        idempotency_key=payload.idempotency_key,
         created_at=creado,  # RN-10: inmutable desde aquí
         updated_at=creado,
     )
     fijar_contexto(db, usuario_id=usuario.id, origen=OrigenCambio.CIUDADANO, fecha_evento=creado)
     db.add(reporte)
-    db.flush()
-    db.commit()
+    try:
+        db.flush()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        carrera = _por_clave(db, usuario, payload.idempotency_key)  # dos envíos simultáneos del mismo borrador
+        if carrera is None:
+            raise
+        carrera._reutilizado = True  # type: ignore[attr-defined]
+        return carrera
     return reporte
 
 

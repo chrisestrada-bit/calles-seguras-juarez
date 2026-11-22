@@ -2,6 +2,8 @@ import { useAuth } from './context/useAuth';
 import { SiteHeader } from './components/SiteHeader';
 import { Icon } from './components/Icon';
 import { RainBanner } from './components/RainBanner';
+import { BannerRed } from './components/BannerRed';
+import { PuntosRecurrentesPage } from './pages/PuntosRecurrentesPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { PublicHomePage } from './pages/PublicHomePage';
@@ -19,10 +21,10 @@ function App() {
   useAuth();
   const path = window.location.pathname;
   const folioEdicion = path === '/reportar' ? new URLSearchParams(window.location.search).get('editar') : null;
-  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path === '/aviso-de-privacidad' ? <PrivacyNoticePage /> : folioEdicion ? <ReportEditPage folio={folioEdicion} /> : path === '/reportar' ? <ReportCreatePage /> : path === '/mis-reportes' ? <MyReportsPage /> : path === '/moderacion' ? <ModerationPage /> : path === '/coordinacion' ? <CoordinationPage /> : path === '/admin/colonias' ? <AdminColoniasPage /> : path === '/admin/usuarios' ? <AdminUsuariosPage /> : path === '/mi-zona' ? <ZonePage /> : path === '/dashboard' || path === '/tablero' ? <DashboardPage /> : path === '/auditoria' ? <AuditPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
+  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path === '/aviso-de-privacidad' ? <PrivacyNoticePage /> : folioEdicion ? <ReportEditPage folio={folioEdicion} /> : path === '/reportar' ? <ReportCreatePage /> : path === '/mis-reportes' ? <MyReportsPage /> : path === '/moderacion' ? <ModerationPage /> : path === '/coordinacion' ? <CoordinationPage /> : path === '/puntos-recurrentes' ? <PuntosRecurrentesPage /> : path === '/admin/colonias' ? <AdminColoniasPage /> : path === '/admin/usuarios' ? <AdminUsuariosPage /> : path === '/mi-zona' ? <ZonePage /> : path === '/dashboard' || path === '/tablero' ? <DashboardPage /> : path === '/auditoria' ? <AuditPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
   return (
     <>
-    <SiteHeader /><RainBanner />{contenido}<footer className="site-footer">
+    <SiteHeader /><BannerRed /><RainBanner />{contenido}<footer className="site-footer">
       <svg className="site-footer__art" viewBox="0 0 1200 240" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
         <path d="M-20 60C120 30 260 90 420 70s300-50 460-10 260 40 360 20" />
         <path d="M-20 140c200-20 400 10 620-10s380-40 600-10" />

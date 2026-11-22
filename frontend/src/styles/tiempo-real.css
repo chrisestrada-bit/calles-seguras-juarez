@@ -1,0 +1,63 @@
+/* ==========================================================================
+   Fase 2: insignia de punto recurrente (HU-03.4), campana de avisos (HU-08.2), indicador en vivo (HU-08.3)
+   y banner de red / cola offline (HU-08.4). Usa los tokens del sistema visual (modo claro y oscuro).
+   ========================================================================== */
+
+/* ——— Punto recurrente: ícono + texto, nunca sólo color ——— */
+.badge-recurrente { display: inline-flex; align-items: center; gap: var(--s-1); padding: 0.2rem 0.6rem; border: 1px solid var(--water-700); border-radius: 999px; background: var(--water-50, #e6f6fa); color: var(--water-800); font-size: var(--text-sm); font-weight: 720; white-space: nowrap; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.data-table { width: 100%; border-collapse: collapse; min-width: 36rem; }
+.data-table th, .data-table td { padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.data-table thead th { background: var(--surface-3); font-size: var(--text-sm); color: var(--ink-2); }
+.data-table tbody th { font-weight: 700; }
+.data-table tbody th .icon { margin-right: var(--s-2); vertical-align: -3px; }
+.table-sub { display: block; font-size: var(--text-sm); font-weight: 400; color: var(--ink-3); }
+
+/* ——— Indicador «En vivo» / «Reconectando» ——— */
+.live-status { display: inline-flex; align-items: center; gap: var(--s-2); margin: 0 0 var(--s-3); padding: 0.25rem 0.75rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: var(--text-sm); font-weight: 700; }
+.live-status__dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--ink-3); }
+.live-status--en_vivo { color: var(--water-800); border-color: var(--water-700); }
+.live-status--en_vivo .live-status__dot { background: var(--water-700); animation: pulso 1.8s ease-in-out infinite; }
+.live-status--reconectando { color: var(--road-800); border-color: var(--road-700); }
+.live-status--reconectando .live-status__dot { background: var(--road-700); }
+.live-status__hint { font-weight: 400; color: var(--ink-3); }
+@keyframes pulso { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ——— Campana de avisos ——— */
+.bell { position: relative; }
+.bell__button { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; }
+.bell__button:hover { background: var(--route-50); }
+.bell__button:focus-visible, .bell__item:focus-visible { outline: 3px solid var(--route-600); outline-offset: 2px; }
+.bell__count { position: absolute; top: -0.25rem; right: -0.25rem; min-width: 1.25rem; height: 1.25rem; padding: 0 0.3rem; border-radius: 999px; background: var(--manhole-700); color: #fff; font-size: 0.75rem; font-weight: 800; line-height: 1.25rem; text-align: center; }
+.bell__panel { position: absolute; right: 0; top: calc(100% + 0.5rem); z-index: 60; width: min(22rem, calc(100vw - 2rem)); max-height: 70vh; overflow: auto; padding: var(--s-3); border: 1px solid var(--border-strong); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-3, 0 12px 32px rgb(5 10 21 / 0.25)); }
+.bell__head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-bottom: var(--s-2); }
+.bell__head h2 { margin: 0; font-size: var(--text-md); }
+.bell__list { display: grid; gap: var(--s-1); margin: 0; padding: 0; list-style: none; }
+.bell__item { display: grid; grid-template-columns: auto 1fr; gap: 0 var(--s-2); width: 100%; padding: var(--s-2); border: 0; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.bell__item:hover { background: var(--surface-3); }
+.bell__item.is-unread { background: var(--route-50); font-weight: 650; }
+.bell__dot { grid-row: 1 / span 2; align-self: center; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--route-700); }
+.bell__msg { grid-column: 2; }
+.bell__item:not(.is-unread) .bell__msg { grid-column: 1 / -1; }
+.bell__item time { grid-column: 1 / -1; margin-top: 2px; font-size: var(--text-sm); font-weight: 400; color: var(--ink-3); }
+.install-button { white-space: nowrap; }
+
+/* ——— Banner de red y cola de envío ——— */
+.net-banner-wrap { display: grid; }
+.net-banner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--border-strong); font-size: var(--text-sm); }
+.net-banner--warning { background: var(--road-50); color: var(--road-800); }
+.net-banner--info { background: var(--route-50); color: var(--route-900); }
+.net-banner--error { background: var(--manhole-50); color: var(--manhole-700); }
+.net-banner--ok { background: var(--water-50, #e6f6fa); color: var(--water-800); }
+.net-banner a { color: inherit; font-weight: 700; }
+.net-queue { display: grid; gap: var(--s-2); margin: 0; padding: var(--s-3) var(--s-4); list-style: none; border-bottom: 1px solid var(--border-strong); background: var(--surface); }
+.net-queue__item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border: 1px solid var(--border-strong); border-radius: 10px; }
+.net-queue__item--error, .net-queue__item--conflicto { border-color: var(--manhole-700); }
+.net-queue__meta, .net-queue__motivo { display: block; font-size: var(--text-sm); color: var(--ink-3); }
+.net-queue__motivo { color: var(--manhole-700); }
+.net-queue__acciones { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+[data-theme="dark"] .net-banner--warning, [data-theme="dark"] .net-banner--info, [data-theme="dark"] .net-banner--error, [data-theme="dark"] .net-banner--ok { background: var(--surface-2); color: var(--ink); }
+[data-theme="dark"] .bell__item.is-unread { background: var(--surface-3); }
+@media (prefers-reduced-motion: reduce) { .live-status--en_vivo .live-status__dot { animation: none; } }
+@media (max-width: 480px) { .live-status__hint { display: none; } }

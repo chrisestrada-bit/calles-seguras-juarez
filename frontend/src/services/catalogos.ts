@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { Colonia, ColoniasResponse } from '../types/api';
+import { guardarConsulta, leerConsulta } from './offline';
 
 const POR_PAGINA = 100; // máximo que acepta la API
 
@@ -13,8 +14,15 @@ export function cargarColonias(): Promise<Colonia[]> {
       Array.from({ length: Math.max(0, primera.paginacion.total_paginas - 1) }, (_, i) =>
         api.get<ColoniasResponse>(`/api/v1/catalogos/colonias?pagina=${i + 2}&por_pagina=${POR_PAGINA}`)),
     );
-    return [primera, ...resto].flatMap((pagina) => pagina.datos).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es-MX'));
-  })().catch((error: unknown) => { cache = null; throw error; });
+    const todas = [primera, ...resto].flatMap((pagina) => pagina.datos).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es-MX'));
+    guardarConsulta('catalogo-colonias', todas); // catálogo público: permite crear borradores sin conexión
+    return todas;
+  })().catch((error: unknown) => {
+    cache = null;
+    const guardado = leerConsulta<Colonia[]>('catalogo-colonias');
+    if (guardado) return guardado.datos; // sin red: último catálogo guardado
+    throw error;
+  });
   return cache;
 }
 

@@ -22,6 +22,7 @@ export interface DetalleAlcantarilla { esta_senalizado: boolean; }
 export interface DetalleEncharcamiento { nivel_agua: NivelAgua; hay_riesgo_personas_vehiculos: boolean | null; }
 export type DetalleReporte = DetalleBache | DetalleAlcantarilla | DetalleEncharcamiento;
 export interface ReportePublico {
+  es_punto_recurrente?: boolean | null; dias_distintos_anio?: number | null; ultima_ocurrencia?: string | null;
   folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad;
   ubicacion: Ubicacion; calle: string; referencia: string | null; colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo;
   descripcion: string | null; detalle: DetalleReporte; confirmaciones: number; created_at: string; fecha_programada: string | null;
@@ -31,6 +32,8 @@ export interface ReporteResumenPublico {
   folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad;
   ubicacion: Ubicacion; calle: string; colonia: ReferenciaCatalogo; created_at: string;
   longevidad_dias: number | null; vigencia: Vigencia | null; nivel_agua?: string | null;
+  /** HU-03.4: sólo en encharcamientos. */
+  es_punto_recurrente?: boolean | null; dias_distintos_anio?: number | null; ultima_ocurrencia?: string | null;
 }
 export interface HistorialPublico { estado_anterior: EstadoReporte | null; estado_nuevo: EstadoReporte; origen: OrigenHistorial; fecha: string; }
 export interface Paginacion { pagina: number; por_pagina: number; total: number; total_paginas: number; }
@@ -46,9 +49,9 @@ export interface LoginRequest { correo: string; contrasena: string; }
 export interface LoginResponse { access_token: string; token_type: 'bearer'; expira_en_segundos: number; usuario: UsuarioResumen; }
 export interface UsuarioYo extends UsuarioResumen { correo: string; reportes_ultima_hora: number; limite_reportes_hora: number; }
 
-export interface ReporteBacheRequest { tipo_dano: 'Bache'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; tamano: Tamano; profundidad: Profundidad; carril_afectado: CarrilAfectado; forzar_nuevo: boolean; }
-export interface ReporteAlcantarillaRequest { tipo_dano: 'Alcantarilla sin tapa'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; esta_senalizado: boolean; forzar_nuevo: boolean; }
-export interface ReporteEncharcamientoRequest { tipo_dano: 'Encharcamiento'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; nivel_agua: NivelAgua; hay_riesgo_personas_vehiculos?: boolean; forzar_nuevo: boolean; }
+export interface ReporteBacheRequest { tipo_dano: 'Bache'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; tamano: Tamano; profundidad: Profundidad; carril_afectado: CarrilAfectado; forzar_nuevo: boolean; idempotency_key?: string; }
+export interface ReporteAlcantarillaRequest { tipo_dano: 'Alcantarilla sin tapa'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; esta_senalizado: boolean; forzar_nuevo: boolean; idempotency_key?: string; }
+export interface ReporteEncharcamientoRequest { tipo_dano: 'Encharcamiento'; latitud: number; longitud: number; colonia_id: number; calle: string; referencia?: string; descripcion?: string; nivel_agua: NivelAgua; hay_riesgo_personas_vehiculos?: boolean; forzar_nuevo: boolean; idempotency_key?: string; }
 export type CrearReporteRequest = ReporteBacheRequest | ReporteAlcantarillaRequest | ReporteEncharcamientoRequest;
 /** HU-02.5: sólo en «Recibido»; folio, tipo, ubicación y fecha son inmutables. */
 export interface EditarReporteRequest { colonia_id?: number; calle?: string; referencia?: string | null; descripcion?: string | null; tamano?: Tamano; profundidad?: Profundidad; carril_afectado?: CarrilAfectado; esta_senalizado?: boolean; }
@@ -110,3 +113,17 @@ export interface ListaFotosResponse { folio: string; maximo_por_persona: number;
 /** HU-04.5: marcador público del mapa (sin datos personales). */
 export interface MarcadorMapa { folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad; ubicacion: Ubicacion; calle: string; colonia: ReferenciaCatalogo; nivel_agua: string | null; created_at: string; }
 export interface MapaResponse { total: number; mostrados: number; limite: number; datos: MarcadorMapa[]; }
+
+/** HU-03.4 */
+export interface PuntoRecurrente { ubicacion: Ubicacion; calle: string; colonia: ReferenciaCatalogo; dias_distintos_anio: number; total_reportes: number; ultima_ocurrencia: string; folios: string[]; }
+export interface PuntosRecurrentesResponse { anio: number; radio_metros: number; minimo_dias: number; datos: PuntoRecurrente[]; }
+
+/** HU-08.2 */
+export interface Notificacion { id: string; folio: string; mensaje: string; leida: boolean; created_at: string; }
+export interface PaginaNotificaciones extends RespuestaPaginada<Notificacion> { no_leidas: number; }
+
+/** HU-08.3: mensajes del canal WebSocket de encharcamientos (sólo datos públicos). */
+export type EventoEnVivo =
+  | { tipo: 'hola'; heartbeat_segundos?: number; event_id?: undefined; folio?: undefined; reporte?: undefined }
+  | { tipo: 'ping' | 'pong'; event_id?: undefined; folio?: undefined; reporte?: undefined; heartbeat_segundos?: undefined }
+  | { tipo: 'encharcamiento.creado' | 'encharcamiento.actualizado' | 'encharcamiento.retirado'; event_id: string; folio: string; emitido_en: string; reporte: ReporteResumenPublico | null; heartbeat_segundos?: undefined };

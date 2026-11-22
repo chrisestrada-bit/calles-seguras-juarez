@@ -111,7 +111,11 @@ def detalle_de(r: Reporte) -> DetalleBache | DetalleAlcantarilla | DetalleEnchar
 
 
 def a_resumen(r: Reporte, conteos: Conteos, hoy: date | None = None) -> ReporteResumenPublico:
+    rec = getattr(r, "_recurrencia", None)  # la deja recurrentes.anotar() (HU-03.4)
     return ReporteResumenPublico(
+        es_punto_recurrente=rec.es_punto_recurrente if rec else None,
+        dias_distintos_anio=rec.dias_distintos_anio if rec else None,
+        ultima_ocurrencia=rec.ultima_ocurrencia if rec else None,
         folio=r.folio,
         tipo_dano=r.tipo_dano,
         estado=r.estado,

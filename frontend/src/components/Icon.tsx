@@ -41,6 +41,8 @@ const PATHS = {
   download: <><path d="M12 4v11" /><path d="m7.5 11 4.5 4.5 4.5-4.5" /><path d="M5 19.5h14" /></>,
   map: <><path d="m3.5 6.5 5.5-2 6 2 5.5-2v13l-5.5 2-6-2-5.5 2Z" /><path d="M9 4.5v13M15 6.5v13" /></>,
   list: <path d="M8.5 6.5H20M8.5 12H20M8.5 17.5H20M4 6.5h.01M4 12h.01M4 17.5h.01" />,
+  bell: <><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15Z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></>,
+  repeat: <><path d="M4.5 11V9.5a3 3 0 0 1 3-3h11" /><path d="m15.5 3.5 3 3-3 3" /><path d="M19.5 13v1.5a3 3 0 0 1-3 3h-11" /><path d="m8.5 20.5-3-3 3-3" /></>,
   trash: <><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l1 12.5h9l1-12.5M9.5 7V4.5h5V7" /></>,
 } satisfies Record<string, ReactNode>;
 

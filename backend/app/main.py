@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.errores import registrar_manejadores
-from app.routers import admin, auth, catalogos, clima, geocoding, indicadores, moderacion, reportes
+from app.routers import admin, auth, catalogos, clima, geocoding, indicadores, moderacion, notificaciones, reportes, ws
+from app.services.tiempo_real import gestor
 from app.services.vigencia import expirar_vencidos
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -39,9 +40,11 @@ async def _ciclo_vencimiento() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    gestor.configurar_loop(asyncio.get_running_loop())  # los servicios síncronos publican eventos WebSocket (HU-08.3)
     tarea = asyncio.create_task(_ciclo_vencimiento())
     yield
     tarea.cancel()
+    gestor.configurar_loop(None)
 
 
 app = FastAPI(
@@ -76,7 +79,7 @@ async def encabezados_de_seguridad(request: Request, call_next):
 
 
 PREFIJO = "/api/v1"
-for modulo in (auth, reportes, moderacion, catalogos, admin, indicadores, clima, geocoding):
+for modulo in (auth, reportes, moderacion, catalogos, admin, indicadores, clima, geocoding, notificaciones, ws):
     app.include_router(modulo.router, prefix=PREFIJO)
 
 

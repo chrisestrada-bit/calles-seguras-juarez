@@ -376,6 +376,20 @@ Límite: **3 fotos por persona y reporte** (se valida con candado de fila `SELEC
 
 **Acceso a la imagen** (`GET /api/v1/reportes/{folio}/fotos/{foto_id}`): mientras el reporte esté `Recibido`, sólo lo ven su autor, moderación y coordinación (`403` para visitantes y otros ciudadanos). Al pasar a `Validado` (o cualquier estado posterior público) la foto es pública. Un reporte `Rechazado` responde `404` a quien no sea su autor o moderación (RN-09).
 
+### 4.9 `notificaciones` (HU-08.2)
+
+| Columna | Tipo | Nulo | Default | Restricciones / notas |
+|---------|------|------|---------|-----------------------|
+| `id` | `UUID` | No | `gen_random_uuid()` | PK (no enumerable). |
+| `usuario_id` | `UUID` | No | — | FK → `usuarios.id`. Dueño del aviso: la API filtra siempre por esta columna. |
+| `reporte_id` | `BIGINT` | No | — | FK → `reportes.id` (`RESTRICT`). |
+| `folio` | `VARCHAR(15)` | No | — | Folio público para navegar a `/reportes/:folio`. |
+| `mensaje` | `VARCHAR(800)` | No | — | Texto en español de México; no contiene datos de terceros. |
+| `leida` | `BOOLEAN` | No | `false` | |
+| `created_at` | `TIMESTAMPTZ` | No | `now()` | |
+
+Índice: `idx_notificaciones_usuario (usuario_id, leida, created_at DESC)`. Se crea una fila en la **misma transacción** que el cambio de estado hecho por moderación (si la transacción falla, no hay aviso). Quien hace el cambio no se notifica a sí mismo. Además, `reportes.idempotency_key UUID` (HU-08.4) con índice único parcial `uq_reportes_idempotencia (usuario_id, idempotency_key)`; nunca se expone en la API.
+
 ---
 
 ## 5. Cómo el esquema garantiza las reglas de negocio
@@ -561,6 +575,10 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 | Mapa interactivo (`/reportes/mapa`) | ✅ | ✅ | ✅ | ✅ |
 | Exportar reportes a CSV / XML | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | Importar catálogos desde XML | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Ver y marcar **mis** avisos (`/notificaciones`) | ❌ 401 | ✅ | ✅ | ✅ |
+| Leer avisos de otra persona | ❌ 401 | ❌ 404 | ❌ 404 | ❌ 404 |
+| Canal WebSocket de encharcamientos en vivo (datos públicos) | ✅ | ✅ | ✅ | ✅ |
+| Ver puntos recurrentes de inundación (`/indicadores/puntos-recurrentes`) | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
 | Cola de moderación (incluye `Rechazado`, `autor_id`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | `Recibido → Validado` / `Recibido → Rechazado` | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
 | `Activo → Rechazado` (encharcamiento) | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
@@ -624,3 +642,47 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 ### 10.4 Almacenamiento de fotografías (HU-02.4)
 
 `UPLOADS_DIR` (por defecto `uploads/`; en Docker `/srv/uploads`, montado como volumen nombrado `uploads` para sobrevivir al reinicio del contenedor). El tipo se determina por encabezado binario (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`), sin confiar en extensión ni `Content-Type`. El tope de 5 MB es exacto (5 MB se acepta, 5 MB + 1 byte se rechaza). Una foto inválida se rechaza con su motivo sin afectar al reporte ni a las demás fotos (`201` con `aceptadas`/`rechazadas`; `422` si ninguna es válida).
+
+---
+
+## 11. Requisitos opcionales · Fase 2 (HU-03.4, HU-08.2, HU-08.3, HU-08.4 y punto extra 4.5)
+
+### 11.1 Puntos recurrentes de inundación (HU-03.4)
+
+| Aspecto | Definición |
+|---------|------------|
+| Radio | **50 m** por Haversine (`distancia_haversine_m`, la misma función de la detección de duplicados). El límite es inclusivo (`<= 50`). |
+| Reportes que cuentan | Encharcamientos `Activo` e `Histórico`. Los `Rechazado` y el pavimento **no** cuentan. |
+| Año calendario | Del **1 de enero** al **día de hoy**, ambos en `America/Ciudad_Juarez`. Un reporte del 31 de diciembre del año anterior no cuenta; el año cambia a las 00:00 hora local, no UTC. |
+| Día distinto | Fecha **local** de `created_at` (`timezone('America/Ciudad_Juarez', created_at)::date`). Un reporte a las 23:30 locales y otro a las 00:30 locales son **2 días** aunque estén separados 1 hora; varios reportes el mismo día local son **1 día**. |
+| Umbral | `es_punto_recurrente = true` con **>= 3 días distintos**. Se exponen `dias_distintos_anio` y `ultima_ocurrencia` (sólo en encharcamientos; `null` en pavimento). |
+| Por reporte | La respuesta de lista y de detalle calcula la recurrencia centrada en **ese** reporte (consulta con prefiltro de caja envolvente e índice parcial `idx_reportes_enc_anio`). |
+| Vista de coordinación | `GET /api/v1/indicadores/puntos-recurrentes` agrupa los encharcamientos del año de forma voraz (el más reciente funge de centro; se absorben los que están a <= 50 m) y lista los grupos con >= 3 días, ordenados por días y luego por recencia. |
+
+### 11.2 Avisos sobre mis reportes (HU-08.2)
+
+* Disparo: dentro de `moderacion.transicionar` (misma transacción) para `Validado`, `Rechazado` (incluye el motivo), `Programado` (con fecha), `En reparación` y `Reparado` (con fecha). La fusión de duplicados (Fase 3) reutilizará `notificaciones.notificar`.
+* Aislamiento: toda consulta filtra por `usuario_id`; marcar como leído un aviso ajeno o inexistente devuelve **404** (misma respuesta, sin revelar existencia).
+* Frontend: campana en `SiteHeader` con contador (`aria` describe las no leídas), sondeo cada 60 s y al recuperar el foco.
+
+### 11.3 Tiempo real: WebSocket `/api/v1/ws/encharcamientos` (HU-08.3 · extra 4.5)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Origen de eventos | `crear`, `confirmar` («sigue ahí» / «ya no hay agua»), transiciones de moderación y el vencimiento automático a `Histórico` publican con `tiempo_real.emitir`, **después** del `commit`. Si nadie está conectado no se hace ninguna consulta. |
+| Mensajes | `hola` (al conectar, con el intervalo de latido), `ping`/`pong`, y `encharcamiento.creado\|actualizado\|retirado` con `event_id` (UUID), `folio`, `emitido_en` (hora local) y `reporte` (el mismo `ReporteResumenPublico` público; `null` en `retirado`). **Sin PII** (RN-04): nunca viajan autor, correo ni identificadores internos. |
+| Latido | El servidor envía `ping` cada 20 s; el cliente responde `pong`. Con dos silencios seguidos el servidor cierra (código 1001). El cliente reconecta si no ve latido en 2.5 intervalos. |
+| Deduplicación | Servidor: firma `tipo|folio|estado|vigente_hasta|ciclo` recordada (últimas 500) para no difundir el mismo cambio dos veces. Cliente: por `event_id` y por `folio` (un solo registro por reporte). |
+| Origen permitido | Si el navegador envía `Origin`, debe coincidir con `FRONTEND_URL` (si no, se cierra con 1008); misma política que CORS. |
+| Reconexión y respaldo | Reconexión exponencial 1 s → 15 s. Mientras el canal está caído se activa **sondeo HTTP cada 15 s** de `/reportes?tipo_dano=Encharcamiento&orden=recientes`; al reconectar se hace un sondeo único para recuperar lo perdido. Peor caso de aparición: 15 s de sondeo + latencia < **30 s**. |
+| Interfaz | Indicador `En vivo` / `Reconectando` / `Conectando` (ícono + texto). Los eventos se **fusionan** con la lista y el mapa: actualizan el folio existente, retiran rechazados o los que dejan de cumplir el filtro, insertan los nuevos que sí lo cumplen (sólo en la primera página) y **nunca** reinician ni borran los filtros activos. |
+| Escalado | El gestor de conexiones es **por proceso**. Con varias réplicas del backend se necesitaría un bus (p. ej. Redis Pub/Sub); con una réplica (Docker Compose y el manifiesto de Fase 4) es suficiente. |
+
+### 11.4 PWA y modo sin conexión (HU-08.4)
+
+* `manifest.webmanifest`: `name` «Calles Seguras Juárez», `short_name` «Calles Seguras», `start_url` `/`, `display` `standalone`, iconos 192×192 y 512×512 (+ maskable 512), colores de tema y fondo.
+* **Service Worker** (`/sw.js`, sólo en producción): *shell* de la app y `/assets/` (cache primero), navegación con red primero y respaldo a `index.html`, y **últimas consultas públicas** (`/reportes`, `/reportes/mapa`, `/reportes/{folio}`, máx. 30). **Nunca** cachea peticiones con `Authorization`, métodos distintos de `GET` ni rutas privadas. Al cerrar sesión la app borra `localStorage` de caché pública y manda `limpiar-caches` al SW.
+* **Vista sin conexión**: la consulta pública guarda su última respuesta (`csj.cache.*`, máx. 8) y, sin red, la muestra con el aviso «Sin conexión … última consulta guardada el *fecha y hora*» (hora de Ciudad Juárez). También se guarda el catálogo de colonias para poder crear borradores.
+* **Cola de envío** (`csj.cola.<usuario>`): un reporte creado sin conexión se guarda con `idempotency_key` (UUID). Al volver la red (evento `online`, al abrir la app y cada 30 s con pendientes) se envía en orden. El servidor **deduplica por `(usuario_id, idempotency_key)`**: reenviar devuelve el mismo folio (`200` en lugar de `201`) y no cuenta contra el límite de 10/hora. Estados visibles: `Sin conexión`, `Guardado para enviar`, `Enviando`, `No se pudo enviar`.
+* **Conflictos al reconectar**: `409 POSIBLE_DUPLICADO` → el borrador se conserva con los folios cercanos y las opciones «Enviar como daño distinto» o «Descartar»; `422` (territorio u otros) → se conserva con el motivo; `429` → se reintenta más tarde; `401` → se conserva hasta iniciar sesión. Un borrador **nunca se descarta solo**.
+* **Limitaciones documentadas**: las fotografías no se guardan sin conexión; la cola vive en el dispositivo de cada persona (se conserva tras cerrar sesión para no perder reportes y sólo se envía con la sesión de su dueño); `beforeinstallprompt` sólo existe en navegadores Chromium, por lo que el botón «Instalar app» aparece únicamente allí.

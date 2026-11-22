@@ -27,7 +27,7 @@ from app.schemas.reportes import (
     ReportePublico,
     ReporteResumenPublico,
 )
-from app.services import confirmaciones, exportacion, fotos, presentacion, reportes
+from app.services import confirmaciones, exportacion, fotos, presentacion, recurrentes, reportes, tiempo_real
 from app.services.vigencia import expirar_vencidos
 
 router = APIRouter(prefix="/reportes", tags=["reportes"])
@@ -84,6 +84,7 @@ def listar(
 ) -> dict:
     expirar_vencidos(db)
     filas, total = reportes.listar_publicos(db, orden=f.orden, pag=pag, **f.filtros)
+    recurrentes.anotar(db, filas)
     conteos = presentacion.conteos_confirmaciones(db, filas)
     return armar_pagina([presentacion.a_resumen(r, conteos) for r in filas], total, pag)
 
@@ -222,6 +223,10 @@ def crear(
     expirar_vencidos(db)
     reporte = reportes.crear_reporte(db, usuario, payload)
     response.headers["Location"] = f"/api/v1/reportes/{reporte.folio}"
+    if getattr(reporte, "_reutilizado", False):
+        response.status_code = status.HTTP_200_OK  # reenvío idempotente: mismo reporte, sin duplicar
+    else:
+        tiempo_real.emitir(db, reporte, "creado")  # HU-08.3
     conteos = presentacion.conteos_confirmaciones(db, [reporte])
     return presentacion.a_publico(reporte, conteos, usuario, set())
 
@@ -257,6 +262,7 @@ def detalle(
 ) -> ReportePublico:
     expirar_vencidos(db)
     reporte = reportes.obtener_visible(db, folio)
+    recurrentes.anotar(db, [reporte])
     conteos = presentacion.conteos_confirmaciones(db, [reporte])
     confirmados = presentacion.confirmados_por_usuario(db, [reporte], usuario)
     return presentacion.a_publico(reporte, conteos, usuario, confirmados)
@@ -298,7 +304,9 @@ def confirmar(
     usuario: Usuario = Depends(CUALQUIER_ROL),
     db: Session = Depends(get_db),
 ) -> ConfirmacionOut:
-    return confirmaciones.confirmar(db, folio, usuario, datos.tipo)
+    resultado = confirmaciones.confirmar(db, folio, usuario, datos.tipo)
+    tiempo_real.emitir(db, reportes.obtener_por_folio(db, folio), "actualizado")  # HU-08.3
+    return resultado
 
 
 @router.patch(

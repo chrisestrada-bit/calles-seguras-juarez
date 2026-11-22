@@ -28,7 +28,7 @@ from app.schemas.moderacion import (
     TransicionIn,
     TransicionOut,
 )
-from app.services import transiciones
+from app.services import notificaciones, transiciones
 from app.services.historial import fijar_contexto
 from app.services.presentacion import conteos_confirmaciones, detalle_de, longevidad_dias
 from app.services.sqlutil import error_validacion, fecha_local_sql, validar_rango_fechas
@@ -215,6 +215,7 @@ def transicionar(db: Session, usuario: Usuario, folio: str, datos: TransicionIn)
     fijar_contexto(db, usuario_id=usuario.id, origen=OrigenCambio.MODERACION, motivo=datos.motivo, fecha_evento=ahora)
     reporte.estado = nuevo
     db.flush()
+    notificaciones.notificar_cambio_estado(db, reporte, nuevo, usuario, datos.motivo)  # HU-08.2
     resultado = TransicionOut(
         folio=reporte.folio,
         estado_anterior=anterior,

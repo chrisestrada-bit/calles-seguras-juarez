@@ -134,6 +134,12 @@ export async function obtenerBlob(path: string): Promise<Blob> {
   return response.blob();
 }
 
+/** URL absoluta del WebSocket de la API (http→ws, https→wss). */
+export function urlWebSocket(path: string): string {
+  const base = API_BASE_URL || window.location.origin;
+  return `${base.replace(/^http/, 'ws')}${path}`;
+}
+
 export const api = {
   get: <T>(path: string, init?: RequestInit) => apiFetch<T>(path, { ...init, method: 'GET' }),
   post: <T>(path: string, body?: unknown, init?: RequestInit) => apiFetch<T>(path, { ...init, method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),

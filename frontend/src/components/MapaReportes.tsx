@@ -3,6 +3,7 @@ import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import { Icon } from './Icon';
 import { EmptyState, StatusBadge, TypeBadge, TypeGlyph } from './ui';
 import { fechaHora } from '../utils/formato';
+import { fusionarEnVivo, type FiltrosLista, type Vivos } from '../utils/enVivo';
 import type { MapaResponse, TipoDano, Ubicacion } from '../types/api';
 
 // Leaflet pesa ~150 kB: sólo se descarga cuando alguien abre la vista de mapa.
@@ -15,16 +16,22 @@ interface Props {
   /** Mismos filtros de la lista (HU-04.2), ya serializados como query string. */
   filtros: string;
   onVerLista: () => void;
+  /** HU-08.3: encharcamientos recibidos en vivo y filtros activos para decidir si se muestran. */
+  vivos?: Vivos;
+  filtrosLista?: FiltrosLista;
 }
 
 /** HU-04.5: mapa interactivo con los mismos filtros que la lista, sin datos personales (RN-04). */
-export function MapaReportes({ filtros, onVerLista }: Props) {
+export function MapaReportes({ filtros, onVerLista, vivos = {}, filtrosLista }: Props) {
   const consulta = useCargaDatos<MapaResponse>(`/api/v1/reportes/mapa?${filtros}`, obtenerJson, 'No fue posible cargar el mapa de reportes.');
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [mapaCaido, setMapaCaido] = useState(false);
   const [miUbicacion, setMiUbicacion] = useState<Ubicacion | null>(null);
   const [avisoGps, setAvisoGps] = useState('');
-  const marcadores = useMemo(() => consulta.datos?.datos ?? [], [consulta.datos]);
+  const marcadores = useMemo(
+    () => (filtrosLista ? fusionarEnVivo(consulta.datos?.datos ?? [], vivos, filtrosLista, true) : consulta.datos?.datos ?? []),
+    [consulta.datos, vivos, filtrosLista],
+  );
   const elegido = marcadores.find((m) => m.folio === seleccionado) ?? null;
 
   const centrar = () => {

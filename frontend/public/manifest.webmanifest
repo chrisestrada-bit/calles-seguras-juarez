@@ -1,0 +1,23 @@
+{
+  "name": "Calles Seguras Juárez",
+  "short_name": "Calles Seguras",
+  "description": "Consulta y reporta baches y encharcamientos en Ciudad Juárez, Chihuahua.",
+  "lang": "es-MX",
+  "dir": "ltr",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f5f9",
+  "theme_color": "#13277d",
+  "categories": ["navigation", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Reportar un daño", "short_name": "Reportar", "url": "/reportar", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}

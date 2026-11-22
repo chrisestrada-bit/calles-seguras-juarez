@@ -10,6 +10,8 @@ from app.models import EstadoReporte, Severidad, TipoDano, Usuario
 from app.schemas.comun import Pagina, ParametrosPagina, armar_pagina, respuestas
 from app.schemas.moderacion import ReporteModeracion, ReporteModeracionItem, TransicionIn, TransicionOut
 from app.services import moderacion as servicio
+from app.services import reportes as servicio_reportes
+from app.services import tiempo_real
 from app.services.vigencia import expirar_vencidos
 
 router = APIRouter(prefix="/moderacion", tags=["moderacion"])
@@ -79,4 +81,8 @@ def transicionar(
     db: Session = Depends(get_db),
 ) -> TransicionOut:
     expirar_vencidos(db)
-    return servicio.transicionar(db, usuario, folio, datos)
+    resultado = servicio.transicionar(db, usuario, folio, datos)
+    tiempo_real.emitir(
+        db, servicio_reportes.obtener_por_folio(db, folio), "retirado" if resultado.estado.value == "Rechazado" else "actualizado"
+    )  # HU-08.3
+    return resultado
