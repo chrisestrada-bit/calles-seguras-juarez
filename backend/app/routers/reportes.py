@@ -17,6 +17,7 @@ from app.schemas.reportes import (
     HistorialPublicoItem,
     MiReporte,
     ReporteCrear,
+    ReporteEditar,
     ReportePublico,
     ReporteResumenPublico,
 )
@@ -204,6 +205,24 @@ def confirmar(
     return confirmaciones.confirmar(db, folio, usuario, datos.tipo)
 
 
+@router.patch(
+    "/{folio}",
+    response_model=ReportePublico,
+    summary="Editar mi reporte mientras está «Recibido» (HU-02.5)",
+    responses=respuestas(401, 403, 404, 409, 422),
+)
+def editar(
+    folio: FolioPath,
+    datos: ReporteEditar,
+    usuario: Usuario = Depends(CUALQUIER_ROL),
+    db: Session = Depends(get_db),
+) -> ReportePublico:
+    reporte = reportes.editar_reporte(db, usuario, folio, datos)
+    conteos = presentacion.conteos_confirmaciones(db, [reporte])
+    confirmados = presentacion.confirmados_por_usuario(db, [reporte], usuario)
+    return presentacion.a_publico(reporte, conteos, usuario, confirmados)
+
+
 @router.delete(
     "/{folio}",
     summary="No disponible: los reportes nunca se eliminan (RN-07)",
@@ -215,5 +234,5 @@ def eliminar(folio: FolioPath) -> None:
         405,
         "METODO_NO_PERMITIDO",
         "Los reportes no se pueden eliminar. Un reporte improcedente se marca como «Rechazado» con su motivo.",
-        headers={"Allow": "GET, POST"},
+        headers={"Allow": "GET, PATCH"},
     )

@@ -3,7 +3,8 @@ import { api } from '../services/api';
 import { ApiError } from '../services/api';
 import { ReportCard } from './ReportCard';
 import { Icon } from './Icon';
-import { EmptyState, ReportGridSkeleton, tonoDeTipo } from './ui';
+import { EmptyState, ReportGridSkeleton } from './ui';
+import { tonoDeTipo } from '../utils/formato';
 import type { ReporteResumenPublico, RespuestaPaginada } from '../types/api';
 
 const LIMITES = { latMin: 31.45, latMax: 31.8, lngMin: -106.65, lngMax: -106.25 };
@@ -22,7 +23,8 @@ const distanciaKm = (aLat: number, aLng: number, bLat: number, bLng: number) => 
 };
 const esIntransitable = (r: ReporteResumenPublico) => r.tipo_dano === 'Encharcamiento' && r.nivel_agua?.toLowerCase() === 'intransitable';
 const esEncharcamientoActivo = (r: ReporteResumenPublico) => r.tipo_dano === 'Encharcamiento' && r.estado === 'Activo';
-const prioridad = (r: ReporteResumenPublico) => (esIntransitable(r) ? 2 : esEncharcamientoActivo(r) ? 1 : 0);
+/** Reporte con su distancia (m) al punto consultado. */
+type Cercano = ReporteResumenPublico & { distancia_m: number };
 
 function Resumen({ zona, origen }: { zona: ReporteResumenPublico[]; origen: string }) {
   const intransitables = zona.filter(esIntransitable);
@@ -96,7 +98,7 @@ function Radar({ estado, centro, zona }: { estado: 'espera' | 'escaneando' | 'li
 }
 
 export function ZoneSection() {
-  const [zona, setZona] = useState<ReporteResumenPublico[] | null>(null);
+  const [zona, setZona] = useState<Cercano[] | null>(null);
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(false);
   const [origen, setOrigen] = useState('');
@@ -113,9 +115,11 @@ export function ZoneSection() {
     try {
       const bbox = `${lng - dLng},${lat - dLat},${lng + dLng},${lat + dLat}`;
       const respuesta = await api.get<RespuestaPaginada<ReporteResumenPublico>>(`/api/v1/reportes?bbox=${bbox}&por_pagina=100`);
+      // HU-04.3: del más cercano al más lejano (Haversine); los intransitables se resaltan en la alerta y la tarjeta.
       const cerca = respuesta.datos
-        .filter((r) => distanciaKm(lat, lng, r.ubicacion.latitud, r.ubicacion.longitud) <= RADIO_KM)
-        .sort((a, b) => prioridad(b) - prioridad(a));
+        .map((r) => ({ ...r, distancia_m: distanciaKm(lat, lng, r.ubicacion.latitud, r.ubicacion.longitud) * 1000 }))
+        .filter((r) => r.distancia_m <= RADIO_KM * 1000)
+        .sort((a, b) => a.distancia_m - b.distancia_m);
       setZona(cerca);
       if (!cerca.length) setMensaje(`No encontramos reportes en un radio de 1 km de ${nombre}.`);
     } catch (e) {
@@ -164,9 +168,9 @@ export function ZoneSection() {
         {!cargando && mensaje && !(zona && zona.length === 0) && <p className="zone-note" role="status"><Icon name="info" size={18} />{mensaje}</p>}
         {!cargando && zona && zona.length > 0 && (
           <>
-            <p className="zone-summary" role="status"><span className="tabular">{zona.length}</span> reporte(s) a 1 km de <strong>{origen}</strong>.</p>
+            <p className="zone-summary" role="status"><span className="tabular">{zona.length}</span> reporte(s) a 1 km de <strong>{origen}</strong>, del más cercano al más lejano.</p>
             <Resumen zona={zona} origen={origen} />
-            <div className="report-grid">{zona.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>
+            <div className="report-grid">{zona.map((r) => <ReportCard key={r.folio} reporte={r} distanciaMetros={r.distancia_m} />)}</div>
           </>
         )}
       </div>

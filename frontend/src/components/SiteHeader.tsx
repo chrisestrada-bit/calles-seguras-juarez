@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from './Icon';
 import { ThemeToggle } from './ThemeToggle';
 

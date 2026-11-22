@@ -22,7 +22,7 @@ from app.models import (
     Usuario,
 )
 from app.schemas.comun import ParametrosPagina
-from app.schemas.reportes import BacheIn, EncharcamientoIn, ReporteCrear
+from app.schemas.reportes import BacheIn, EncharcamientoIn, ReporteCrear, ReporteEditar
 from app.services import geo
 from app.services.folios import generar_folio
 from app.services.historial import fijar_contexto
@@ -328,3 +328,47 @@ __all__ = [
     "radio_duplicados",
     "verificar_territorio",
 ]
+
+
+# --------------------------------------------------------------------------- edición (HU-02.5)
+
+_CAMPOS_BACHE = {"tamano", "profundidad", "carril_afectado"}
+_CAMPOS_ALCANTARILLA = {"esta_senalizado"}
+
+
+def editar_reporte(db: Session, usuario: Usuario, folio: str, datos: ReporteEditar) -> Reporte:
+    """Sólo el autor y sólo en «Recibido». No cambia estado, por lo que no genera historial."""
+    reporte = db.scalar(select(Reporte).where(Reporte.folio == folio).with_for_update())
+    if reporte is None:
+        raise ErrorAPI(404, "NO_ENCONTRADO", f"No existe un reporte con el folio {folio}.")
+    if reporte.usuario_id != usuario.id:
+        raise ErrorAPI(403, "SIN_PERMISO", "Sólo la persona que creó el reporte puede editarlo.")
+    if reporte.estado != EstadoReporte.RECIBIDO:
+        raise ErrorAPI(
+            409,
+            "REPORTE_NO_EDITABLE",
+            "Sólo puedes editar un reporte mientras está en estado «Recibido» (sin validar).",
+        )
+
+    cambios = datos.model_dump(include=datos.model_fields_set)
+    if not cambios:
+        raise error_validacion("cuerpo", "Indica al menos un campo para actualizar.")
+    no_aplican = (_CAMPOS_ALCANTARILLA if reporte.tipo_dano == TipoDano.BACHE else _CAMPOS_BACHE) & cambios.keys()
+    for campo in sorted(no_aplican):
+        raise error_validacion(campo, f"Este campo no aplica a un reporte de tipo «{reporte.tipo_dano.value}».")
+    for campo in ("calle", *_CAMPOS_BACHE, *_CAMPOS_ALCANTARILLA):
+        if campo in cambios and cambios[campo] is None:
+            raise error_validacion(campo, "Este campo no puede quedar vacío.")
+
+    if "colonia_id" in cambios:
+        colonia = db.get(Colonia, cambios.pop("colonia_id"))
+        if colonia is None or not colonia.activo:
+            raise error_validacion("colonia_id", "La colonia seleccionada no existe o no está activa.")
+        reporte.colonia = colonia
+    for campo, valor in cambios.items():
+        setattr(reporte, campo, valor)
+    if reporte.tipo_dano == TipoDano.BACHE:
+        reporte.severidad = severidad_bache(reporte.tamano, reporte.profundidad)  # type: ignore[arg-type]
+    db.commit()
+    db.refresh(reporte)
+    return reporte

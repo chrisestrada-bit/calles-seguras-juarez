@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 import type { Severidad, TipoDano } from '../types/api';
+import type { Tono } from '../utils/formato';
 
 /* ——— Tipo de daño ——— */
-type Tono = 'road' | 'manhole' | 'water';
 const TIPO: Record<TipoDano, { icon: IconName; tone: Tono; corto: string }> = {
   Bache: { icon: 'pothole', tone: 'road', corto: 'Bache' },
   'Alcantarilla sin tapa': { icon: 'manhole', tone: 'manhole', corto: 'Alcantarilla sin tapa' },
@@ -47,7 +47,6 @@ export function TypeBadge({ tipo }: { tipo: TipoDano }) {
   return <span className={`type-badge type-badge--${t.tone}`}><span className="type-badge__tile"><TypeGlyph tipo={tipo} size={22} /></span>{t.corto}</span>;
 }
 
-export const tonoDeTipo = (tipo: TipoDano): Tono => (TIPO[tipo] ?? TIPO.Bache).tone;
 
 /* ——— Estado del reporte ——— */
 const ESTADO: Record<string, { icon: IconName; tone: string }> = {
@@ -82,13 +81,6 @@ export function SeverityBadge({ severidad, intransitable = false }: { severidad:
       Severidad {String(severidad).toLowerCase()}
     </span>
   );
-}
-
-/* ——— Antigüedad (RN-10: usa longevidad_dias del servidor; si falta, desde created_at) ——— */
-export function antiguedadTexto(longevidad: number | null | undefined, creado: string) {
-  const dias = longevidad ?? Math.max(0, Math.floor((Date.now() - new Date(creado).getTime()) / 86_400_000));
-  if (dias < 1) return 'Hoy';
-  return dias === 1 ? '1 día' : `${dias} días`;
 }
 
 /* ——— Aviso en línea ——— */

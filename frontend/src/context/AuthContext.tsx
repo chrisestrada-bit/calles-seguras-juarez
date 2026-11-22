@@ -1,23 +1,10 @@
-/* oxlint-disable react(only-export-components) */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { LoginResponse, Rol, UsuarioResumen } from '../types/api';
+import { AuthContext } from './authContexto';
 import { api, configurarSesionExpirada, eliminarToken, guardarToken, obtenerToken } from '../services/api';
 
 const USUARIO_KEY = 'calles-seguras.usuario';
 const INACTIVIDAD_MS = 30 * 60 * 1000;
-
-interface AuthContextValue {
-  usuario: UsuarioResumen | null;
-  token: string | null;
-  rolActivo: Rol;
-  autenticado: boolean;
-  iniciarSesion: (respuesta: LoginResponse) => void;
-  renovarSesion: () => Promise<void>;
-  cerrarSesion: () => Promise<void>;
-  cambiarRolActivo: (rol: Rol) => void;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState(obtenerToken);
@@ -85,11 +72,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ usuario, token, rolActivo, autenticado: Boolean(token && usuario), iniciarSesion, renovarSesion, cerrarSesion, cambiarRolActivo }), [usuario, token, rolActivo, iniciarSesion, renovarSesion, cerrarSesion, cambiarRolActivo]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-// oxlint-disable-next-line react(only-export-components)
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth debe usarse dentro de AuthProvider.');
-  return context;
-}
-

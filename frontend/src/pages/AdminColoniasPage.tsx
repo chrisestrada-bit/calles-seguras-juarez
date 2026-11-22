@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
+import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import { api, ApiError } from '../services/api';
 import { ErrorMessage, Guard, PageIntro, Pagination } from '../components/AdminShared';
 import { Icon } from '../components/Icon';
@@ -26,8 +27,8 @@ function ColoniaForm({ sectores, editando, onCancel, onSaved }: { sectores: Sect
       setError('El centro de la colonia debe estar dentro de Ciudad Juárez (latitud 31.45 a 31.80, longitud -106.65 a -106.25).');
       return;
     }
-    if (valores.codigo_postal && !/^32\d{3}$/.test(valores.codigo_postal)) {
-      setError('El código postal debe tener 5 dígitos y comenzar con 32.');
+    if (valores.codigo_postal && !(/^\d{5}$/.test(valores.codigo_postal) && valores.codigo_postal >= '32000' && valores.codigo_postal <= '32730')) {
+      setError('El código postal debe ser de Ciudad Juárez (32000 a 32730).');
       return;
     }
     const cuerpo: ColoniaRequest | ColoniaUpdate = { sector_id: Number(valores.sector_id), nombre: valores.nombre.trim(), latitud_centro: lat, longitud_centro: lng, ...(valores.codigo_postal ? { codigo_postal: valores.codigo_postal } : {}) };
@@ -56,7 +57,7 @@ function ColoniaForm({ sectores, editando, onCancel, onSaved }: { sectores: Sect
         {sectores.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
       </select>
       <label htmlFor="col-cp">Código postal (opcional)</label>
-      <input id="col-cp" inputMode="numeric" pattern="32[0-9]{3}" maxLength={5} value={valores.codigo_postal} onChange={(e) => cambiar('codigo_postal', e.target.value)} />
+      <input id="col-cp" inputMode="numeric" pattern="32[0-7][0-9]{2}" maxLength={5} value={valores.codigo_postal} onChange={(e) => cambiar('codigo_postal', e.target.value)} />
       <label htmlFor="col-lat">Latitud del centro</label>
       <input id="col-lat" required inputMode="decimal" value={valores.latitud_centro} onChange={(e) => cambiar('latitud_centro', e.target.value)} />
       <label htmlFor="col-lng">Longitud del centro</label>
@@ -70,45 +71,27 @@ function ColoniaForm({ sectores, editando, onCancel, onSaved }: { sectores: Sect
 }
 
 export function AdminColoniasPage() {
-  const [sectores, setSectores] = useState<SectorAdmin[]>([]);
-  const [filas, setFilas] = useState<ColoniaFila[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [q, setQ] = useState('');
   const [sector, setSector] = useState('');
   const [pagina, setPagina] = useState(1);
-  const [total, setTotal] = useState(1);
-  const [estado, setEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
-  const [error, setError] = useState('');
   const [formulario, setFormulario] = useState<{ editando: ColoniaFila | null } | null>(null);
   const [mensaje, setMensaje] = useState('');
   const [errorAccion, setErrorAccion] = useState('');
   const [cambiando, setCambiando] = useState<number | null>(null);
   const [recarga, setRecarga] = useState(0);
 
-  useEffect(() => {
-    let activo = true;
-    api.get<{ datos: SectorAdmin[] }>('/api/v1/catalogos/sectores').then((r) => { if (activo) setSectores(r.datos); }).catch(() => undefined);
-    return () => { activo = false; };
-  }, []);
-
-  useEffect(() => {
-    let activo = true;
-    setEstado('cargando');
-    // El contrato no define GET /admin/colonias; se lista el catálogo público, que sólo devuelve colonias activas.
-    api.get<RespuestaPaginada<ColoniaFila>>(`/api/v1/catalogos/colonias?${consulta({ q, sector_id: sector, pagina, por_pagina: POR_PAGINA })}`)
-      .then((r) => {
-        if (!activo) return;
-        setFilas(r.datos.map((c) => ({ ...c, activo: c.activo ?? true })));
-        setTotal(r.paginacion.total_paginas || 1);
-        setEstado('listo');
-      })
-      .catch((e) => {
-        if (!activo) return;
-        setError(e instanceof ApiError ? e.message : 'No fue posible cargar las colonias.');
-        setEstado('error');
-      });
-    return () => { activo = false; };
-  }, [q, sector, pagina, recarga]);
+  const sectores = useCargaDatos<{ datos: SectorAdmin[] }>('/api/v1/catalogos/sectores', obtenerJson).datos?.datos ?? [];
+  // El contrato no define GET /admin/colonias; se lista el catálogo público, que sólo devuelve colonias activas.
+  const consultaColonias = useCargaDatos<RespuestaPaginada<ColoniaFila>>(
+    `/api/v1/catalogos/colonias?${consulta({ q, sector_id: sector, pagina, por_pagina: POR_PAGINA })}#${recarga}`,
+    obtenerJson,
+    'No fue posible cargar las colonias.',
+  );
+  const { estado, error, actualizar } = consultaColonias;
+  const filas = (consultaColonias.datos?.datos ?? []).map((c) => ({ ...c, activo: c.activo ?? true }));
+  const total = consultaColonias.datos?.paginacion.total_paginas || 1;
+  const setFilas = (cambio: (actual: ColoniaFila[]) => ColoniaFila[]) => actualizar((d) => ({ ...d, datos: cambio(d.datos) }));
 
   const buscar = (evento: FormEvent) => {
     evento.preventDefault();
@@ -143,7 +126,7 @@ export function AdminColoniasPage() {
           <h2 id="colonias-filtros" className="visually-hidden">Buscar colonias</h2>
           <form className="filters filters--three" onSubmit={buscar}>
             <div className="field field--search">
-              <label htmlFor="colonias-q">Nombre (mínimo 2 caracteres)</label>
+              <label htmlFor="colonias-q">Nombre o código postal (mínimo 2 caracteres)</label>
               <div className="input-icon"><Icon name="search" size={18} /><input id="colonias-q" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
             </div>
             <div className="field">

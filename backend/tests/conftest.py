@@ -77,7 +77,7 @@ class Cuenta:
 
 def crear_cuenta(client: TestClient, rol: str = "ciudadano") -> Cuenta:
     correo = f"prueba-{uuid.uuid4().hex[:12]}@ejemplo.mx"
-    r = client.post("/api/v1/auth/registro", json={"nombre": "Persona de Prueba", "correo": correo, "contrasena": CONTRASENA})
+    r = client.post("/api/v1/auth/registro", json={"nombre": "Persona de Prueba", "correo": correo, "contrasena": CONTRASENA, "acepta_aviso_privacidad": True})
     assert r.status_code == 201, r.text
     usuario_id = r.json()["id"]
     if rol != "ciudadano":

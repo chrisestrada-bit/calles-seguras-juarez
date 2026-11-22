@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
 
     weather_api_url: str = "https://api.open-meteo.com/v1/forecast"
-    weather_cache_ttl_minutes: int = 30
+    weather_cache_ttl_minutes: int = 60  # HU-08.1: caché de 1 h
+    # Tras un fallo del proveedor no se reintenta durante este lapso (se sirve la caché, aunque esté vencida).
+    weather_backoff_minutes: int = 5
     weather_timeout_seconds: float = 5
 
     # Sólo backend: la llave nunca se envía al frontend ni se registra en logs.

@@ -151,10 +151,10 @@ Sin `usuario_id` ni `motivo`.
 **Petición**
 
 ```json
-{ "nombre": "María Fernanda López", "correo": "maria.lopez@ejemplo.mx", "contrasena": "Lluvia2026" }
+{ "nombre": "María Fernanda López", "correo": "maria.lopez@ejemplo.mx", "contrasena": "Lluvia2026", "acepta_aviso_privacidad": true }
 ```
 
-Validaciones: `nombre` 2–120; `correo` válido; `contrasena` 8–128 caracteres con al menos una letra y un número.
+Validaciones: `nombre` 2–120; `correo` válido; `contrasena` 8–128 caracteres con al menos una letra y un número; `acepta_aviso_privacidad` **obligatorio y `true`** (HU-01.2, LFPDPPP). Si falta o es `false` → `422` («Debes aceptar el aviso de privacidad para crear tu cuenta.»). El servidor guarda la fecha de aceptación (`usuarios.aviso_privacidad_aceptado_at`, UTC). El aviso se publica en `/aviso-de-privacidad` del frontend.
 
 **Códigos:** `201`, `409 CORREO_REGISTRADO`, `422`.
 
@@ -606,9 +606,19 @@ Ejemplo `Reparado`:
 { "error": { "codigo": "AUTOCONFIRMACION_NO_PERMITIDA", "mensaje": "No puedes confirmar ni desmentir tu propio reporte.", "detalles": [] } }
 ```
 
-### 4.8 `DELETE /api/v1/reportes/{folio}`
+### 4.8 `PATCH /api/v1/reportes/{folio}` (HU-02.5)
 
-**No existe.** Responde `405 METODO_NO_PERMITIDO` para todos los roles (RN-07). Un reporte improcedente se lleva a `Rechazado` desde moderación.
+| Rol | Descripción |
+|-----|-------------|
+| Autor (`ciudadano`, `moderador`, `coordinador`) | Corrige su propio reporte **mientras está en `Recibido`**. |
+
+Campos opcionales (al menos uno): `colonia_id`, `calle` (3–150), `referencia` (≤ 200, `""` → `null`), `descripcion` (≤ 500, `""` → `null`); sólo `Bache`: `tamano`, `profundidad`, `carril_afectado`; sólo `Alcantarilla sin tapa`: `esta_senalizado`. Folio, tipo, ubicación, autor y fecha original son **inmutables** (RN-03, RN-10): enviarlos → `422` (campo no permitido). La severidad se recalcula en el servidor. La edición no cambia el estado, por lo que no genera historial.
+
+**Códigos:** `200` (`ReportePublico`), `401`, `403 SIN_PERMISO` (no es el autor), `404`, `409 REPORTE_NO_EDITABLE` (ya no está en `Recibido`; los encharcamientos nacen `Activo` y no son editables), `422`.
+
+### 4.9 `DELETE /api/v1/reportes/{folio}`
+
+**No existe.** Responde `405 METODO_NO_PERMITIDO` (encabezado `Allow: GET, PATCH`) para todos los roles (RN-07). Un reporte improcedente se lleva a `Rechazado` desde moderación.
 
 ---
 
@@ -785,7 +795,7 @@ Catálogo local de colonias. Lo usa el formulario de reporte (selector de `colon
 
 | Parámetro | Tipo | Obligatorio | Descripción |
 |-----------|------|:-----------:|-------------|
-| `q` | string (2–80) | No | **Filtro por nombre.** Coincidencia parcial sin distinguir mayúsculas (`ILIKE '%q%'`) más similitud por trigramas (`pg_trgm`, índice `idx_colonias_nombre_trgm`), para tolerar errores de escritura (`"partdo romro"` → `Partido Romero`). Orden: coincidencia exacta, luego mayor similitud, luego alfabético. |
+| `q` | string (2–80) | No | **Código postal:** si `q` son sólo dígitos (2 a 5), filtra por código postal completo o prefijo (`?q=32310`, `?q=325`), ordenado por código postal y nombre. **En otro caso, filtro por nombre.** Coincidencia parcial sin distinguir mayúsculas (`ILIKE '%q%'`) más similitud por trigramas (`pg_trgm`, índice `idx_colonias_nombre_trgm`), para tolerar errores de escritura (`"partdo romro"` → `Partido Romero`). Orden: coincidencia exacta, luego mayor similitud, luego alfabético. |
 | `sector_id` | int | No | **Filtro por sector.** Sólo colonias de ese sector. Si el sector no existe → `422`. |
 | `pagina`, `por_pagina` | int | No | Paginación (§1.3). |
 
@@ -973,7 +983,7 @@ PATCH acepta `nombre`, `codigo_postal`, `latitud_centro`, `longitud_centro`, `se
 
 ## 8. Dominio `indicadores`
 
-Los **históricos y reparados cuentan** en todas las métricas (RN-06). Los `Rechazado` se excluyen de las métricas públicas.
+Los **históricos y reparados cuentan** en todas las métricas (RN-06). Los `Rechazado` se excluyen de las métricas públicas. No existe `GET /api/v1/indicadores` (responde `404`): usa las subrutas `/resumen`, `/sectores`, `/longevidad` y `/moderacion`.
 
 ### 8.1 `GET /api/v1/indicadores/resumen`
 
@@ -1061,7 +1071,7 @@ Baches abiertos más antiguos (RN-10). **Query:** `sector_id`, `limite` (1–50,
 | Rol | `visitante` |
 |-----|-------------|
 
-Consulta `WEATHER_API_URL` a lo sumo una vez cada `WEATHER_CACHE_TTL_MINUTES` y guarda en `cache_clima`.
+Consulta `WEATHER_API_URL` a lo sumo una vez cada `WEATHER_CACHE_TTL_MINUTES` (**60 min** por omisión, HU-08.1) y guarda en `cache_clima`. Si el proveedor falla, durante `WEATHER_BACKOFF_MINUTES` (5 min) no se vuelve a consultar: se responde de inmediato con la última caché marcada `desactualizado: true`, o `503` si no hay ninguna.
 **Códigos:** `200`, `503 CLIMA_NO_DISPONIBLE` (proveedor caído **y** sin caché).
 
 ```json
@@ -1119,13 +1129,13 @@ Búsqueda de direcciones para ubicar un reporte en el mapa (**HU-02.1**) y para 
 
 | Rol | Descripción |
 |-----|-------------|
-| `visitante` | Convierte un texto libre (calle, cruce, lugar, colonia) en coordenadas **dentro de Ciudad Juárez**. |
+| `visitante` | Convierte un texto libre (calle, cruce, lugar, colonia) o un **código postal de Juárez** en coordenadas **dentro de Ciudad Juárez**. |
 
 **Query**
 
 | Parámetro | Tipo | Obligatorio | Descripción |
 |-----------|------|:-----------:|-------------|
-| `q` | string (3–120) | Sí | Texto a buscar. Ej.: `Av. Tecnológico y Ejército Nacional`. Se le quitan espacios repetidos y caracteres de control. |
+| `q` | string (3–120) | Sí | Texto a buscar. Ej.: `Av. Tecnológico y Ejército Nacional` o `32310`. Se le quitan espacios repetidos y caracteres de control. Un código postal de 5 dígitos se resuelve **siempre con el catálogo local** (`fuente: "catalogo_local"`, `degradado: false`, `precision: "colonia"`, centro de cada colonia); si está fuera de `32000`–`32730` → `422` («El código postal … no pertenece a Ciudad Juárez»). |
 | `limite` | int (1–10) | No | Máximo de resultados. Default `5`. |
 
 #### Llamada que hace el backend (no visible para el cliente)
@@ -1214,7 +1224,7 @@ No aplica `401`/`403`: es público para que el visitante pueda consultar calles 
     }
   ],
   "atribucion": null,
-  "mensaje": "El buscador de direcciones no está disponible en este momento. Te mostramos colonias que coinciden; ajusta el marcador en el mapa para indicar el punto exacto."
+  "mensaje": "El buscador de direcciones no está disponible en este momento. Te mostramos colonias que coinciden (ubicación aproximada al centro de la colonia); para indicar el punto exacto usa tu ubicación GPS estando en el lugar del daño."
 }
 ```
 
@@ -1236,7 +1246,35 @@ No aplica `401`/`403`: es público para que el visitante pueda consultar calles 
 { "error": { "codigo": "LIMITE_BUSQUEDAS", "mensaje": "Hiciste demasiadas búsquedas en poco tiempo. Espera unos segundos e intenta de nuevo.", "detalles": [] } }
 ```
 
-### 10.2 Protección de la llave de LocationIQ
+### 10.2 `GET /api/v1/geocoding/inversa`
+
+| Rol | Descripción |
+|-----|-------------|
+| `visitante` | Convierte una coordenada **dentro de Juárez** (RN-01) en calle y colonia sugeridas. El formulario la usa tras obtener el GPS. |
+
+**Query:** `latitud`, `longitud` (obligatorios). Fuera de los límites → `422 FUERA_DE_JUAREZ`. Comparte el límite de 30 consultas por minuto por IP (`429 LIMITE_BUSQUEDAS`).
+
+Con `GEOCODING_API_KEY`, el backend consulta `/reverse` de LocationIQ (`fuente: "locationiq"`); sin llave o si falla, responde con la colonia registrada más cercana (≤ 1.5 km) del catálogo local (`fuente: "catalogo_local"`, `degradado: true`).
+
+```json
+{
+  "fuente": "catalogo_local",
+  "degradado": true,
+  "ubicacion": { "latitud": 31.733, "longitud": -106.463 },
+  "calle": null,
+  "etiqueta": "Partido Romero, Ciudad Juárez, Chihuahua",
+  "colonia_sugerida": { "id": 4, "nombre": "Partido Romero", "codigo_postal": "32030", "sector": { "id": 3, "nombre": "Centro" } },
+  "colonias_cercanas": [
+    { "id": 4, "nombre": "Partido Romero", "codigo_postal": "32030", "sector": { "id": 3, "nombre": "Centro" }, "distancia_metros": 0.0 }
+  ],
+  "atribucion": null,
+  "mensaje": "Sugerimos la colonia registrada más cercana al punto. Confirma la colonia y escribe el nombre de la calle."
+}
+```
+
+**Códigos:** `200`, `422`, `429`.
+
+### 10.3 Protección de la llave de LocationIQ
 
 | Control | Detalle |
 |---------|---------|
@@ -1298,6 +1336,7 @@ No aplica `401`/`403`: es público para que el visitante pueda consultar calles 
 | reportes | GET | `/api/v1/reportes/mios` | ciudadano, moderador, coordinador | 200 |
 | reportes | GET | `/api/v1/reportes/{folio}` | visitante | 200 |
 | reportes | GET | `/api/v1/reportes/{folio}/historial` | visitante | 200 |
+| reportes | PATCH | `/api/v1/reportes/{folio}` | autor del reporte (sólo en `Recibido`) | 200 |
 | reportes | POST | `/api/v1/reportes/{folio}/confirmaciones` | ciudadano, moderador, coordinador | 201 |
 | reportes | DELETE | `/api/v1/reportes/{folio}` | — | 405 siempre |
 | moderacion | GET | `/api/v1/moderacion/reportes` | moderador, coordinador | 200 |
@@ -1319,3 +1358,4 @@ No aplica `401`/`403`: es público para que el visitante pueda consultar calles 
 | clima | GET | `/api/v1/clima/pronostico` | visitante | 200 |
 | clima | GET | `/api/v1/clima/riesgo-inundacion` | visitante | 200 |
 | geocoding | GET | `/api/v1/geocoding/buscar` | visitante | 200 (incluye *fallback*) |
+| geocoding | GET | `/api/v1/geocoding/inversa` | visitante | 200 (incluye *fallback*) |

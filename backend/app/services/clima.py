@@ -24,6 +24,9 @@ HORAS_PRONOSTICO = 6
 UMBRAL_PROBABILIDAD_PCT = 60
 UMBRAL_PRECIPITACION_MM = 1.0
 
+# D-24: después de un fallo del proveedor no se vuelve a consultar hasta este instante (por proceso).
+_sin_reintentos_hasta: datetime | None = None
+
 _DESCRIPCIONES = {
     0: "Cielo despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado",
     45: "Niebla", 48: "Niebla con escarcha", 51: "Llovizna ligera", 53: "Llovizna moderada",
@@ -103,6 +106,18 @@ def _armar(normalizada: dict[str, Any], obtenido: datetime, desactualizado: bool
     }
 
 
+def _degradado(cache: CacheClima | None) -> dict[str, Any]:
+    """Degradación elegante: última respuesta guardada (marcada desactualizada) o 503 si no hay ninguna."""
+    if cache is not None:
+        return _armar(cache.respuesta, cache.obtenido_at, True)
+    raise ErrorAPI(503, "CLIMA_NO_DISPONIBLE", "El servicio de clima no está disponible en este momento.")
+
+
+def reiniciar_retroceso() -> None:
+    global _sin_reintentos_hasta
+    _sin_reintentos_hasta = None
+
+
 def obtener_pronostico(db: Session) -> dict[str, Any]:
     s = get_settings()
     ahora = ahora_utc()
@@ -110,16 +125,18 @@ def obtener_pronostico(db: Session) -> dict[str, Any]:
     if cache is not None and cache.expira_at > ahora:
         return _armar(cache.respuesta, cache.obtenido_at, False)
 
+    global _sin_reintentos_hasta
+    if _sin_reintentos_hasta is not None and ahora < _sin_reintentos_hasta:
+        return _degradado(cache)  # retroceso: no se espera otro timeout del proveedor
+
     try:
         normalizada = _consultar_proveedor()
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         # Sólo el tipo de error: el mensaje de httpx puede incluir la URL completa.
         logger.warning("Proveedor de clima no disponible (%s)", type(exc).__name__)
-        if cache is not None:
-            return _armar(cache.respuesta, cache.obtenido_at, True)
-        raise ErrorAPI(
-            503, "CLIMA_NO_DISPONIBLE", "El servicio de clima no está disponible en este momento."
-        ) from None
+        _sin_reintentos_hasta = ahora + timedelta(minutes=s.weather_backoff_minutes)
+        return _degradado(cache)
+    _sin_reintentos_hasta = None
 
     horas = _proximas_horas(normalizada, ahora)
     valores = {
