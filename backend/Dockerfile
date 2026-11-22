@@ -16,9 +16,12 @@ RUN pip install -r requirements.txt
 
 COPY backend/app ./app
 COPY db ./db
+# Esquemas XSD (HU-07.3) que valida el servidor.
+COPY docs/esquemas ./docs/esquemas
 
 # Usuario sin privilegios.
-RUN useradd --system --no-create-home --uid 10001 api && chown -R api:api /srv
+# Directorio persistente de fotografías (HU-02.4): se monta como volumen en docker-compose.yml.
+RUN useradd --system --no-create-home --uid 10001 api && mkdir -p /srv/uploads && chown -R api:api /srv
 USER api
 
 EXPOSE 8000

@@ -15,6 +15,7 @@ from app.models.enums import (
     TipoConfirmacion,
     TipoDano,
 )
+from app.models.foto import ReporteFoto
 from app.models.historial import HistorialEstado
 from app.models.reporte import Reporte
 from app.models.territorio import Colonia, Sector
@@ -33,6 +34,7 @@ __all__ = [
     "OrigenCambio",
     "ProfundidadBache",
     "Reporte",
+    "ReporteFoto",
     "RolUsuario",
     "Sector",
     "Severidad",

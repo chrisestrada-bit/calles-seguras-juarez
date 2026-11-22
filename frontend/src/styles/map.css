@@ -1,0 +1,66 @@
+/* ==========================================================================
+   HU-02.4 fotografías · HU-04.5 mapa interactivo · HU-07.3 exportación
+   Usa los tokens del sistema visual (global.css) para respetar modo claro/oscuro.
+   ========================================================================== */
+
+/* ——— Selector de fotografías ——— */
+.photo-picker { display: grid; gap: var(--s-3); margin-block: var(--s-4); }
+.photo-picker__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
+.photo-picker .button.is-disabled { opacity: 0.5; pointer-events: none; }
+.photo-picker__head label.button { cursor: pointer; }
+.photo-picker__head:focus-within label.button { outline: 3px solid var(--route-600); outline-offset: 3px; }
+.photo-picker__count { margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+.photo-picker__list { display: grid; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.photo-picker__item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-3); padding: var(--s-2); border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.photo-picker__item img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; background: var(--surface-3); }
+.photo-picker__item div { display: grid; min-width: 0; }
+.photo-picker__item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.photo-picker__item span { font-size: var(--text-sm); color: var(--ink-3); }
+.photo-picker .form-error { display: flex; align-items: center; gap: var(--s-2); margin: 0; }
+.duplicate-box__photos { display: grid; gap: var(--s-2); margin-block: var(--s-3); }
+.duplicate-box__photos h4 { margin: 0; font-size: var(--text-md); }
+
+/* ——— Galería en el detalle ——— */
+.detail-card__photos { margin-top: var(--s-5); }
+.detail-card__photos h2 { display: flex; align-items: center; gap: var(--s-2); font-size: var(--text-lg); }
+.photo-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+.photo-gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-3); }
+
+/* ——— Barra de vista (lista/mapa) y exportación ——— */
+.view-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin-block: var(--s-4); }
+.view-toggle, .export-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+/* ——— Mapa ——— */
+.map-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); }
+.map-layout { display: grid; gap: var(--s-4); grid-template-columns: 1fr; }
+.report-map { width: 100%; height: min(70vh, 520px); min-height: 320px; border-radius: 16px; border: 1px solid var(--border-strong); overflow: hidden; z-index: 0; background: var(--surface-3); }
+.map-state { display: flex; align-items: center; justify-content: center; gap: var(--s-3); min-height: 320px; border: 1px dashed var(--border-strong); border-radius: 16px; color: var(--ink-2); }
+.spinner { width: 1.25rem; height: 1.25rem; border: 3px solid var(--border-strong); border-top-color: var(--route-600); border-radius: 50%; animation: giro 0.8s linear infinite; }
+@keyframes giro { to { transform: rotate(360deg); } }
+.map-panel { display: grid; align-content: start; gap: var(--s-2); padding: var(--s-4); border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); }
+.map-panel h4 { margin: 0; font-size: var(--text-lg); }
+.map-panel p { display: flex; align-items: center; gap: var(--s-2); margin: 0; color: var(--ink-2); }
+.map-panel__badges { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.map-list { margin-top: var(--s-4); border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.map-list summary { cursor: pointer; padding: var(--s-3) var(--s-4); font-weight: 700; }
+.map-list summary:focus-visible { outline: 3px solid var(--route-600); outline-offset: 2px; }
+.map-list ul { display: grid; gap: var(--s-1); max-height: 20rem; overflow: auto; margin: 0; padding: 0 var(--s-4) var(--s-4); list-style: none; }
+.link-button { padding: 0; border: 0; background: none; color: var(--route-700); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* Marcadores: ícono + letra + color (texto blanco sobre los tonos 700: contraste >= 4.5:1). */
+.map-pin-wrap { background: none; border: 0; }
+.map-pin { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 44px; height: 30px; border-radius: 999px; border: 2px solid #fff; color: #fff; font-size: 12px; box-shadow: 0 2px 6px rgb(5 10 21 / 0.45); }
+.map-pin b { font-weight: 800; line-height: 1; }
+.map-pin--road { background: var(--road-700); }
+.map-pin--manhole { background: var(--manhole-700); }
+.map-pin--water { background: var(--water-700); }
+.map-pin.is-selected { outline: 3px solid var(--signal); outline-offset: 2px; transform: scale(1.12); }
+.leaflet-marker-icon:focus-visible .map-pin { outline: 3px solid var(--signal); outline-offset: 2px; }
+.report-map .leaflet-control-attribution { font-size: 11px; }
+
+@media (min-width: 900px) {
+  .map-layout { grid-template-columns: minmax(0, 1fr) 20rem; }
+}
+
+[data-theme="dark"] .report-map .leaflet-tile-pane { filter: brightness(0.8) contrast(1.05); }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } .map-pin.is-selected { transform: none; } }

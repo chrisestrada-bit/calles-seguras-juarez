@@ -214,3 +214,28 @@ class ConfirmacionOut(BaseModel):
     estado_reporte: EstadoReporte
     vigencia: Vigencia | None
     mensaje: str
+
+
+# --------------------------------------------------------------------------- mapa (HU-04.5)
+
+
+class MarcadorMapa(BaseModel):
+    """Punto público del mapa: sin datos de la persona reportante (RN-04)."""
+
+    folio: str
+    tipo_dano: TipoDano
+    estado: EstadoReporte
+    etiqueta_publica: str | None
+    severidad: Severidad
+    ubicacion: Ubicacion
+    calle: str
+    colonia: ColoniaRef
+    nivel_agua: str | None = None
+    created_at: FechaLocal
+
+
+class MapaRespuesta(BaseModel):
+    total: int
+    mostrados: int
+    limite: int
+    datos: list[MarcadorMapa]

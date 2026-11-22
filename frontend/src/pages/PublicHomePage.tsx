@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react';
-import { api } from '../services/api';
+import { lazy, Suspense, useState, type FormEvent } from 'react';
+import { api, ApiError, descargarArchivo } from '../services/api';
+import { useAuth } from '../context/useAuth';
 import { agruparPorSector, cargarColonias, etiquetaColonia } from '../services/catalogos';
 import { useCargaDatos } from '../hooks/useCargaDatos';
 import { ReportCard } from '../components/ReportCard';
@@ -10,11 +11,25 @@ import { EmptyState, ReportGridSkeleton, TypeGlyph } from '../components/ui';
 import { HeroMap } from '../components/HeroMap';
 import type { ReporteResumenPublico, ReportePublico, RespuestaPaginada, TipoDano, EstadoReporte } from '../types/api';
 
+const MapaReportes = lazy(() => import('../components/MapaReportes').then((m) => ({ default: m.MapaReportes })));
+
 const tipos: TipoDano[] = ['Bache', 'Alcantarilla sin tapa', 'Encharcamiento'];
 const estados: EstadoReporte[] = ['Recibido', 'Validado', 'Programado', 'En reparación', 'Reparado', 'Activo', 'Histórico'];
 const PATRON_FOLIO = /^(BCH|ENC)-\d{4}-\d{6}$/i;
 const SIN_FILTROS = { busqueda: '', tipo: '', estado: '', colonia: '', desde: '', hasta: '' };
 type Filtros = typeof SIN_FILTROS;
+
+/** Filtros de HU-04.2 como query string: los comparten la lista, el mapa y la exportación (HU-04.5, HU-07.3). */
+function paramsFiltros(f: Filtros): URLSearchParams {
+  const params = new URLSearchParams();
+  if (f.busqueda.trim().length >= 3 && !PATRON_FOLIO.test(f.busqueda.trim())) params.set('calle', f.busqueda.trim());
+  if (f.tipo) params.set('tipo_dano', f.tipo);
+  if (f.estado) params.set('estado', f.estado);
+  if (f.colonia) params.set('colonia_id', f.colonia);
+  if (f.desde) params.set('desde', f.desde);
+  if (f.hasta) params.set('hasta', f.hasta);
+  return params;
+}
 
 /** Clave de la consulta: un folio exacto o la URL de la lista con todos los filtros combinados (HU-04.2). */
 function claveDeConsulta(f: Filtros, pagina: number): string {
@@ -46,6 +61,11 @@ export function PublicHomePage() {
   const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS); // lo que se está escribiendo
   const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS); // lo que se consultó
   const [pagina, setPagina] = useState(1);
+  const [vista, setVista] = useState<'lista' | 'mapa'>('lista');
+  const [exportando, setExportando] = useState<'csv' | 'xml' | null>(null);
+  const [errorExportar, setErrorExportar] = useState('');
+  const { usuario } = useAuth();
+  const puedeExportar = usuario?.rol === 'moderador' || usuario?.rol === 'coordinador';
   const consulta = useCargaDatos(claveDeConsulta(aplicados, pagina), cargarReportes, 'No fue posible cargar los reportes.');
   const catalogo = useCargaDatos('colonias', cargarCatalogo, 'No pudimos cargar las colonias.');
   const reportes = consulta.datos?.datos ?? [];
@@ -60,6 +80,12 @@ export function PublicHomePage() {
   const cambiar = (campo: keyof Filtros, valor: string) => {
     setBorrador((actual) => ({ ...actual, [campo]: valor }));
     if (campo !== 'busqueda') aplicar({ ...borrador, [campo]: valor });
+  };
+  const exportar = async (formato: 'csv' | 'xml') => {
+    setExportando(formato); setErrorExportar('');
+    try { await descargarArchivo(`/api/v1/reportes/exportar/${formato}?${paramsFiltros(aplicados)}`, `reportes.${formato}`); }
+    catch (e) { setErrorExportar(e instanceof ApiError ? e.message : 'No fue posible exportar los reportes.'); }
+    finally { setExportando(null); }
   };
   const buscar = (evento: FormEvent) => { evento.preventDefault(); aplicar(borrador); };
   const limpiar = () => { setBorrador(SIN_FILTROS); aplicar(SIN_FILTROS); };
@@ -137,10 +163,26 @@ export function PublicHomePage() {
           </form>
         </section>
 
+        <div className="view-toolbar">
+          <div className="view-toggle" role="group" aria-label="Forma de ver los reportes">
+            <button type="button" className={`button button--sm ${vista === 'lista' ? '' : 'button--secondary'}`} aria-pressed={vista === 'lista'} onClick={() => setVista('lista')}><Icon name="list" size={18} />Lista</button>
+            <button type="button" className={`button button--sm ${vista === 'mapa' ? '' : 'button--secondary'}`} aria-pressed={vista === 'mapa'} onClick={() => setVista('mapa')}><Icon name="map" size={18} />Mapa</button>
+          </div>
+          {puedeExportar && (
+            <div className="export-actions" role="group" aria-label="Exportar los reportes filtrados">
+              <button type="button" className="button button--secondary button--sm" disabled={exportando !== null} onClick={() => void exportar('csv')}><Icon name="download" size={18} />{exportando === 'csv' ? 'Exportando…' : 'Exportar CSV'}</button>
+              <button type="button" className="button button--secondary button--sm" disabled={exportando !== null} onClick={() => void exportar('xml')}><Icon name="download" size={18} />{exportando === 'xml' ? 'Exportando…' : 'Exportar XML'}</button>
+            </div>
+          )}
+        </div>
+        {errorExportar && <div className="form-error" role="alert">{errorExportar}</div>}
+
+        {vista === 'mapa' ? <Suspense fallback={<div className="map-state" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}><MapaReportes filtros={paramsFiltros(aplicados).toString()} onVerLista={() => setVista('lista')} /></Suspense> : <>
         {cargando ? <ReportGridSkeleton count={6} /> : error ? <div className="form-error" role="alert">{error}</div> : reportes.length === 0
           ? <EmptyState art="search" title="No hay reportes que coincidan con tus filtros" action={<a className="button button--primary" href="/reportar"><Icon name="plus" size={18} />Reportar un daño</a>}>{hayFiltros ? 'Prueba con otra calle, otra colonia u otras fechas, o usa «Limpiar filtros».' : 'Aún no hay reportes públicos. Sé la primera persona en reportar un daño.'}</EmptyState>
           : <div className="report-grid">{reportes.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>}
         <Pagination page={pagina} total={totalPaginas} onChange={setPagina} label="Paginación de reportes" />
+        </>}
       </section>
     </main>
   );

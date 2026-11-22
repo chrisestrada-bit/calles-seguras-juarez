@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     geocoding_api_key: SecretStr = SecretStr("")
     geocoding_timeout_seconds: float = 5
 
+    # HU-02.4: directorio persistente de fotos (en Docker, un volumen montado). Nunca se sirve como estático.
+    uploads_dir: str = "uploads"
+
     @property
     def es_produccion(self) -> bool:
         return self.app_env.lower() == "production"

@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import SOLO_COORDINADOR, get_db
@@ -12,6 +12,7 @@ from app.schemas.admin import (
     ColoniaEditar,
     EstadoUsuarioIn,
     EstadoUsuarioOut,
+    ImportacionCatalogos,
     RolIn,
     RolOut,
     SectorAdmin,
@@ -21,6 +22,7 @@ from app.schemas.admin import (
 )
 from app.schemas.comun import Pagina, ParametrosPagina, armar_pagina, respuestas
 from app.services import admin as servicio
+from app.services import catalogos_xml
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -148,3 +150,29 @@ def editar_colonia(
     db: Session = Depends(get_db),
 ) -> ColoniaAdmin:
     return _colonia(servicio.editar_colonia(db, colonia_id, datos))
+
+
+@router.post(
+    "/catalogos/importar-xml",
+    response_model=ImportacionCatalogos,
+    summary="Importar o actualizar sectores y colonias desde XML (esquema catalogos_v1.xsd)",
+    description=(
+        "Sube un archivo XML (máx. 2 MB) validado contra `docs/esquemas/catalogos_v1.xsd`. Es transaccional: "
+        "si el XML está mal formado, incumple el esquema o referencia sectores inexistentes, no se importa nada."
+    ),
+    responses=respuestas(401, 403, 413, 422),
+)
+def importar_catalogos_xml(
+    archivo: Annotated[UploadFile, File(description="Archivo XML de catálogos.")],
+    _: Usuario = Depends(SOLO_COORDINADOR),
+    db: Session = Depends(get_db),
+) -> ImportacionCatalogos:
+    contenido = archivo.file.read(catalogos_xml.MAX_BYTES_XML + 1)
+    r = catalogos_xml.importar(db, contenido)
+    return ImportacionCatalogos(
+        sectores_creados=r.sectores_creados,
+        sectores_actualizados=r.sectores_actualizados,
+        colonias_creadas=r.colonias_creadas,
+        colonias_actualizadas=r.colonias_actualizadas,
+        mensaje="Catálogos importados correctamente.",
+    )

@@ -98,3 +98,11 @@ class ColoniaAdmin(BaseModel):
     sector: SectorRef
     centro: Centro
     activo: bool
+
+
+class ImportacionCatalogos(BaseModel):
+    sectores_creados: int
+    sectores_actualizados: int
+    colonias_creadas: int
+    colonias_actualizadas: int
+    mensaje: str

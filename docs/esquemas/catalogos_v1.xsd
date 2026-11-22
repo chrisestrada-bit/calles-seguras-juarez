@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Esquema de importación de catálogos territoriales (Punto extra 4.4) — versión 1.
+  Usado por POST /api/v1/admin/catalogos/importar-xml (rol coordinador).
+  Una colonia referencia a su sector por `sector_clave`, que debe existir en la base o declararse en este mismo documento.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="https://callesseguras.juarez.mx/esquemas/catalogos/v1"
+           targetNamespace="https://callesseguras.juarez.mx/esquemas/catalogos/v1"
+           elementFormDefault="qualified">
+
+  <xs:simpleType name="ClaveTipo">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Z0-9-]{2,20}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="NombreTipo">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="2"/>
+      <xs:maxLength value="120"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="CodigoPostalTipo">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9]{5}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="LatitudTipo">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="31.45"/>
+      <xs:maxInclusive value="31.80"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="LongitudTipo">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="-106.65"/>
+      <xs:maxInclusive value="-106.25"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="SectorTipo">
+    <xs:attribute name="clave" type="ClaveTipo" use="required"/>
+    <xs:attribute name="nombre" type="NombreTipo" use="required"/>
+    <xs:attribute name="activo" type="xs:boolean" use="optional" default="true"/>
+  </xs:complexType>
+
+  <xs:complexType name="ColoniaTipo">
+    <xs:attribute name="sector_clave" type="ClaveTipo" use="required"/>
+    <xs:attribute name="nombre" type="NombreTipo" use="required"/>
+    <xs:attribute name="codigo_postal" type="CodigoPostalTipo" use="optional"/>
+    <xs:attribute name="latitud_centro" type="LatitudTipo" use="required"/>
+    <xs:attribute name="longitud_centro" type="LongitudTipo" use="required"/>
+    <xs:attribute name="activo" type="xs:boolean" use="optional" default="true"/>
+  </xs:complexType>
+
+  <xs:element name="catalogos">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="sectores" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="sector" type="SectorTipo" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="colonias" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="colonia" type="ColoniaTipo" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="version" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

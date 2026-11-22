@@ -359,6 +359,23 @@ Restricciones:
 
 Estrategia: *upsert* por `clave_consulta`. Si el proveedor falla y existe caché vencida, se sirve marcada como `desactualizado: true`; si no hay caché, `503`.
 
+### 4.8 `reporte_fotos` (HU-02.4)
+
+| Columna | Tipo | Nulo | Default | Restricciones / notas |
+|---------|------|------|---------|-----------------------|
+| `id` | `UUID` | No | `gen_random_uuid()` | PK; es el `foto_id` público. |
+| `reporte_id` | `BIGINT` | No | — | FK → `reportes.id` (`RESTRICT`). |
+| `usuario_id` | `UUID` | No | — | FK → `usuarios.id`. Nunca se expone (RN-04). |
+| `ruta_almacenamiento` | `VARCHAR(80)` | No | — | `UNIQUE`. Nombre de archivo `UUIDv4` + `.jpg`/`.png`; no se deriva del nombre original. |
+| `nombre_original` | `VARCHAR(150)` | No | — | Sólo se muestra como texto; se sanea (sin rutas ni `<>"`). |
+| `mime_type` | `VARCHAR(20)` | No | — | `CHECK IN ('image/jpeg','image/png')`; se detecta por *magic bytes*, no por el cliente. |
+| `tamano_bytes` | `INTEGER` | No | — | `CHECK (> 0 AND <= 5242880)` (5 MB). |
+| `created_at` | `TIMESTAMPTZ` | No | `now()` | Inmutable (RN-10): el trigger `trg_reporte_fotos_inmutable` rechaza todo `UPDATE`. |
+
+Límite: **3 fotos por persona y reporte** (se valida con candado de fila `SELECT … FOR UPDATE` para que dos solicitudes simultáneas no lo superen). Sólo suben fotos quien creó el reporte o quien lo confirmó (HU-02.3). Los archivos viven en `UPLOADS_DIR` (volumen `uploads` en Docker); **nunca** se sirven como estáticos.
+
+**Acceso a la imagen** (`GET /api/v1/reportes/{folio}/fotos/{foto_id}`): mientras el reporte esté `Recibido`, sólo lo ven su autor, moderación y coordinación (`403` para visitantes y otros ciudadanos). Al pasar a `Validado` (o cualquier estado posterior público) la foto es pública. Un reporte `Rechazado` responde `404` a quien no sea su autor o moderación (RN-09).
+
 ---
 
 ## 5. Cómo el esquema garantiza las reglas de negocio
@@ -539,6 +556,11 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 | Buscar duplicados cercanos | ❌ 401 | ✅ | ✅ | ✅ |
 | Confirmar / "Sigue ahí" / "Ya no hay agua" (no sobre reporte propio) | ❌ 401 | ✅ | ✅ | ✅ |
 | Ver "Mis reportes" | ❌ 401 | ✅ | ✅ | ✅ |
+| Adjuntar hasta 3 fotos JPG/PNG (autor o quien confirmó el reporte) | ❌ 401 | ✅ | ✅ | ✅ |
+| Ver fotos de un reporte `Recibido` (autor, moderación y coordinación) | ❌ 403 | ❌ 403 (salvo autor) | ✅ | ✅ |
+| Mapa interactivo (`/reportes/mapa`) | ✅ | ✅ | ✅ | ✅ |
+| Exportar reportes a CSV / XML | ❌ 401 | ❌ 403 | ✅ | ✅ |
+| Importar catálogos desde XML | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
 | Cola de moderación (incluye `Rechazado`, `autor_id`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | `Recibido → Validado` / `Recibido → Rechazado` | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
 | `Activo → Rechazado` (encharcamiento) | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
@@ -565,3 +587,40 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 | A08 Integridad de datos | Historial append-only, triggers de inmutabilidad, folios del servidor. |
 | A09 Registro y alertas | Bitácora de transiciones, intentos de acceso `401/403/429` registrados **sin** contraseñas, tokens ni correos completos. |
 | A10 Manejo de condiciones excepcionales | Manejador global de excepciones que devuelve errores genéricos en español sin trazas; caída del proveedor de clima degradada a caché (`desactualizado: true`) o `503`. |
+
+---
+
+## 10. Requisitos opcionales · Fase 1 (HU-02.4, HU-04.5, HU-07.3 y puntos extra 4.3 / 4.4)
+
+### 10.1 Cartografía del mapa interactivo (HU-04.5 · extra 4.3)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Librería | **Leaflet 1.9** + **leaflet.markercluster** (agrupación en alta densidad), cargadas de forma diferida (`React.lazy`) sólo al abrir la vista de mapa. |
+| Proveedor de mosaicos | **OpenStreetMap** (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`). Es el único servicio externo que consulta el *navegador*: sólo recibe coordenadas de mosaico y la IP, nunca datos de reportes. Los datos de reportes salen exclusivamente de `GET /api/v1/reportes/mapa`. |
+| Atribución | «© colaboradores de OpenStreetMap», visible en el control de atribución del mapa (licencia ODbL). |
+| Límites y cuotas | La [política de uso de mosaicos de OSM](https://operations.osmfoundation.org/policies/tiles/) admite uso moderado y exige atribución; no es para tráfico masivo. Para producción de alto volumen se debe sustituir `TILES_URL` (`frontend/src/components/mapaUtils.ts`) por un proveedor con SLA (p. ej. MapTiler/Stadia) o un servidor de mosaicos propio. El mapa limita el zoom mínimo y el área a Ciudad Juárez (RN-01). |
+| Falla del proveedor | Tras 4 errores de mosaico consecutivos se avisa al usuario y se abre automáticamente la **lista accesible** con los mismos puntos; la vista «Lista» sigue disponible siempre. |
+| Permisos de geolocalización | **Nunca** se solicitan al cargar. Sólo al pulsar «Centrar en mi ubicación», tras mostrar un aviso de que la posición se usa únicamente para centrar el mapa en el dispositivo (no se envía ni se guarda). Si se niega el permiso o la posición está fuera de Juárez, el mapa sigue funcionando. |
+| Accesibilidad | Marcadores con **ícono + letra (B/A/E) + color**, `title`/`alt` descriptivos, foco por teclado (Enter abre el resumen), leyenda con texto y lista alternativa (`<details>`). |
+| Endpoint | `GET /api/v1/reportes/mapa` comparte **exactamente** los filtros de `GET /api/v1/reportes` (mismo `FiltrosReportes`), excluye `Rechazado` (RN-09), devuelve hasta 2000 puntos con `total`/`mostrados` y no incluye datos personales (RN-04). |
+
+### 10.2 Exportación CSV / XML (HU-07.3 · extra 4.4)
+
+* `GET /api/v1/reportes/exportar/csv` y `/xml`: sólo `moderador` y `coordinador`; respetan los mismos filtros de consulta; hasta 50 000 filas (cabeceras `X-Total-Registros` / `X-Registros-Exportados`).
+* **CSV**: UTF-8 **con BOM** (Excel respeta acentos y «ñ»); columnas `folio, tipo_dano, ubicacion, colonia, estado, fecha_creacion, fecha_actualizacion`. Las celdas que empiezan con `= + - @` se prefijan con `'` para evitar **inyección de fórmulas**.
+* **XML**: se arma con `lxml`, se **valida contra `docs/esquemas/reportes_v1.xsd` antes de entregarlo** (si no valida responde `500 XML_INVALIDO`), con espacio de nombres `https://callesseguras.juarez.mx/esquemas/reportes/v1`. Fechas ISO-8601 en `America/Ciudad_Juarez` (RN-02). Resultado vacío = documento válido con `total="0"`.
+* Ninguna exportación incluye nombres, correos, identificadores internos ni datos de la persona reportante (RN-04). `ubicacion` es la calle, no coordenadas.
+
+### 10.3 Importación XML de catálogos (extra 4.4)
+
+`POST /api/v1/admin/catalogos/importar-xml` (sólo `coordinador`, archivo ≤ 2 MB, `multipart/form-data`, campo `archivo`):
+
+1. Se analiza con un *parser* sin resolución de entidades ni red y se rechaza todo `DOCTYPE` (defensa contra **XXE** y *billion laughs*).
+2. Se valida contra `docs/esquemas/catalogos_v1.xsd` (rangos de Juárez incluidos, RN-01).
+3. **Integridad referencial**: cada colonia debe referenciar un `sector_clave` que exista en la base o se declare en el mismo XML; el código postal debe ser de Juárez; no se permiten colonias repetidas.
+4. Es **transaccional** (todo o nada) e **idempotente** (*upsert* por `clave` de sector y `(sector, nombre)` de colonia). Los errores son detallados, en español y con número de línea.
+
+### 10.4 Almacenamiento de fotografías (HU-02.4)
+
+`UPLOADS_DIR` (por defecto `uploads/`; en Docker `/srv/uploads`, montado como volumen nombrado `uploads` para sobrevivir al reinicio del contenedor). El tipo se determina por encabezado binario (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`), sin confiar en extensión ni `Content-Type`. El tope de 5 MB es exacto (5 MB se acepta, 5 MB + 1 byte se rechaza). Una foto inválida se rechaza con su motivo sin afectar al reporte ni a las demás fotos (`201` con `aceptadas`/`rechazadas`; `422` si ninguna es válida).

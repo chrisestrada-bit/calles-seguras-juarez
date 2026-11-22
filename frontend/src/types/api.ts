@@ -100,3 +100,13 @@ export interface GeocodingResultado { etiqueta: string; calle: string | null; ub
 export interface GeocodingResponse { fuente: 'locationiq' | 'catalogo_local'; degradado: boolean; datos: GeocodingResultado[]; atribucion: string | null; mensaje: string | null; }
 export interface GeocodingInversaResponse { fuente: 'locationiq' | 'catalogo_local'; degradado: boolean; ubicacion: Ubicacion; calle: string | null; etiqueta: string; colonia_sugerida: ColoniaSugerida | null; colonias_cercanas: Array<ColoniaSugerida & { distancia_metros: number }>; atribucion: string | null; mensaje: string | null; }
 export interface ColoniasResponse { datos: Colonia[]; paginacion: Paginacion; }
+
+/** HU-02.4: evidencia fotográfica. */
+export interface FotoReporte { id: string; url: string; nombre_original: string; mime_type: 'image/jpeg' | 'image/png'; tamano_bytes: number; created_at: string; }
+export interface FotoRechazada { nombre: string; motivo: string; }
+export interface FotosSubidasResponse { folio: string; aceptadas: FotoReporte[]; rechazadas: FotoRechazada[]; mensaje: string; }
+export interface ListaFotosResponse { folio: string; maximo_por_persona: number; datos: FotoReporte[]; }
+
+/** HU-04.5: marcador público del mapa (sin datos personales). */
+export interface MarcadorMapa { folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad; ubicacion: Ubicacion; calle: string; colonia: ReferenciaCatalogo; nivel_agua: string | null; created_at: string; }
+export interface MapaResponse { total: number; mostrados: number; limite: number; datos: MarcadorMapa[]; }

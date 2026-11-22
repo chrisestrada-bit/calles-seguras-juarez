@@ -216,6 +216,14 @@ def obtener_visible(db: Session, folio: str) -> Reporte:
     return reporte
 
 
+def obtener_por_folio(db: Session, folio: str) -> Reporte:
+    """Búsqueda sin filtro de visibilidad: el llamador decide quién puede ver el reporte (p. ej. fotos)."""
+    reporte = db.scalar(select(Reporte).where(Reporte.folio == folio))
+    if reporte is None:
+        raise ErrorAPI(404, "NO_ENCONTRADO", f"No existe un reporte con el folio {folio}.")
+    return reporte
+
+
 def historial_publico(db: Session, reporte: Reporte) -> list[HistorialEstado]:
     return list(
         db.scalars(
@@ -229,8 +237,7 @@ def historial_publico(db: Session, reporte: Reporte) -> list[HistorialEstado]:
 _RANGO_SEVERIDAD = case({Severidad.ALTA: 3, Severidad.MEDIA: 2}, value=Reporte.severidad, else_=1)
 
 
-def listar_publicos(
-    db: Session,
+def condiciones_publicas(
     *,
     tipos: list[TipoDano] | None,
     estados: list[EstadoReporte] | None,
@@ -241,9 +248,8 @@ def listar_publicos(
     bbox: str | None,
     desde: date | None,
     hasta: date | None,
-    orden: str,
-    pag: ParametrosPagina,
-) -> tuple[list[Reporte], int]:
+) -> list:
+    """Filtros de HU-04.2 compartidos por la lista, el mapa (HU-04.5) y la exportación (HU-07.3)."""
     if estados and EstadoReporte.RECHAZADO in estados:
         raise error_validacion("estado", "El estado «Rechazado» no está disponible en consultas públicas.")
     validar_rango_fechas(desde, hasta)
@@ -275,12 +281,24 @@ def listar_publicos(
         condiciones.append(fecha_local_sql(Reporte.created_at) >= desde)
     if hasta:
         condiciones.append(fecha_local_sql(Reporte.created_at) <= hasta)
+    return condiciones
 
-    ordenes = {
-        "recientes": [Reporte.created_at.desc()],
-        "longevidad": [Reporte.created_at.asc()],
-        "severidad": [_RANGO_SEVERIDAD.desc(), Reporte.created_at.desc()],
-    }
+
+_ORDENES = {
+    "recientes": lambda: [Reporte.created_at.desc()],
+    "longevidad": lambda: [Reporte.created_at.asc()],
+    "severidad": lambda: [_RANGO_SEVERIDAD.desc(), Reporte.created_at.desc()],
+}
+
+
+def listar_publicos(
+    db: Session,
+    *,
+    orden: str,
+    pag: ParametrosPagina,
+    **filtros,
+) -> tuple[list[Reporte], int]:
+    condiciones = condiciones_publicas(**filtros)
     total = db.scalar(
         select(func.count()).select_from(Reporte).join(Colonia, Reporte.colonia_id == Colonia.id).where(*condiciones)
     ) or 0
@@ -288,9 +306,25 @@ def listar_publicos(
         select(Reporte)
         .join(Colonia, Reporte.colonia_id == Colonia.id)
         .where(*condiciones)
-        .order_by(*ordenes[orden], Reporte.id.desc())
+        .order_by(*_ORDENES[orden](), Reporte.id.desc())
         .limit(pag.por_pagina)
         .offset(pag.offset)
+    ).all()
+    return list(filas), total
+
+
+def listar_sin_paginar(db: Session, *, orden: str, limite: int, **filtros) -> tuple[list[Reporte], int]:
+    """Todos los reportes que cumplen los filtros (hasta `limite`) y el total real. Para mapa y exportación."""
+    condiciones = condiciones_publicas(**filtros)
+    total = db.scalar(
+        select(func.count()).select_from(Reporte).join(Colonia, Reporte.colonia_id == Colonia.id).where(*condiciones)
+    ) or 0
+    filas = db.scalars(
+        select(Reporte)
+        .join(Colonia, Reporte.colonia_id == Colonia.id)
+        .where(*condiciones)
+        .order_by(*_ORDENES[orden](), Reporte.id.desc())
+        .limit(limite)
     ).all()
     return list(filas), total
 
@@ -323,7 +357,10 @@ __all__ = [
     "crear_reporte",
     "historial_publico",
     "listar_mios",
+    "condiciones_publicas",
     "listar_publicos",
+    "listar_sin_paginar",
+    "obtener_por_folio",
     "obtener_visible",
     "radio_duplicados",
     "verificar_territorio",

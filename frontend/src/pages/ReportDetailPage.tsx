@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../services/api';
 import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from '../components/Icon';
+import { FotosReporte } from '../components/FotosReporte';
 import { BlockSkeleton, EmptyState, SeverityBadge, StatusBadge, TypeBadge } from '../components/ui';
 import { antiguedadTexto, fechaCalendario, fechaHora as fechaLarga } from '../utils/formato';
 import type { HistorialResponse, ReportePublico } from '../types/api';
@@ -68,6 +69,8 @@ export function ReportDetailPage({ folio }: { folio: string }) {
               <p>{reporte.descripcion}</p>
             </section>
           )}
+
+          <FotosReporte folio={reporte.folio} />
 
           {puedeConfirmar && (
             <section className="confirmation-panel" aria-labelledby="confirmaciones-titulo">

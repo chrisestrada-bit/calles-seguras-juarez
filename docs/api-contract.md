@@ -1359,3 +1359,66 @@ Con `GEOCODING_API_KEY`, el backend consulta `/reverse` de LocationIQ (`fuente: 
 | clima | GET | `/api/v1/clima/riesgo-inundacion` | visitante | 200 |
 | geocoding | GET | `/api/v1/geocoding/buscar` | visitante | 200 (incluye *fallback*) |
 | geocoding | GET | `/api/v1/geocoding/inversa` | visitante | 200 (incluye *fallback*) |
+
+---
+
+## 10. Extensiones opcionales · Fase 1
+
+> Todas las rutas están en `/api/v1`, documentadas en `/docs` (OpenAPI) y devuelven errores con la envoltura estándar (§1.4).
+
+### 10.1 `POST /api/v1/reportes/{folio}/fotos` (HU-02.4)
+
+`multipart/form-data` con el campo repetido `archivos` (hasta 3 imágenes **JPG/PNG**, ≤ 5 MB = `5 * 1024 * 1024` bytes cada una). Requiere sesión; sólo quien creó o confirmó el reporte.
+
+| Código | Cuándo |
+|--------|--------|
+| `201` | Al menos una foto válida. Cuerpo: `{ folio, aceptadas: [FotoOut], rechazadas: [{nombre, motivo}], mensaje }`. |
+| `401` | Sin sesión. |
+| `403` | La persona no creó ni confirmó el reporte. |
+| `404` | Folio inexistente (o `Rechazado` ajeno). |
+| `409` | Reporte `Rechazado` (propio): ya no admite fotos. |
+| `422` | Ninguna foto válida (`FOTOS_INVALIDAS`, un detalle por archivo: formato, tamaño, vacío o límite de 3). |
+
+`FotoOut`: `{ id, url, nombre_original, mime_type, tamano_bytes, created_at }` (sin datos de quien la subió).
+
+### 10.2 `GET /api/v1/reportes/{folio}/fotos` y `GET /api/v1/reportes/{folio}/fotos/{foto_id}`
+
+Lista de metadatos (`{ folio, maximo_por_persona, datos }`) y archivo binario (`image/jpeg` o `image/png`, `Cache-Control: private`). Con el reporte en `Recibido` sólo el autor, moderación y coordinación (`200`); visitantes y otros ciudadanos reciben `403 FOTO_NO_DISPONIBLE`. Desde `Validado` son públicas. `404` si el reporte está `Rechazado` (para quien no sea autor/moderación) o la foto no existe.
+
+### 10.3 `GET /api/v1/reportes/mapa` (HU-04.5)
+
+Acepta los **mismos parámetros que `GET /api/v1/reportes`** (`tipo_dano`, `estado`, `solo_vigentes`, `colonia_id`, `sector_id`, `calle`, `bbox`, `desde`, `hasta`, `orden`) sin paginación. Público.
+
+```json
+{
+  "total": 1240, "mostrados": 1240, "limite": 2000,
+  "datos": [{
+    "folio": "BCH-2026-000418", "tipo_dano": "Bache", "estado": "Recibido",
+    "etiqueta_publica": "Sin validar", "severidad": "Alta",
+    "ubicacion": { "latitud": 31.7201, "longitud": -106.4602 },
+    "calle": "Av. Tecnológico", "colonia": { "id": 3, "nombre": "Partido Escobedo" },
+    "nivel_agua": null, "created_at": "2026-11-22T09:15:00-07:00"
+  }]
+}
+```
+
+Nunca incluye `Rechazado` (`422` si se pide ese estado) ni datos de la persona reportante (RN-04, RN-09).
+
+### 10.4 `GET /api/v1/reportes/exportar/csv` · `GET /api/v1/reportes/exportar/xml` (HU-07.3)
+
+Roles `moderador` y `coordinador` (`401` sin sesión, `403` para ciudadanos). Mismos filtros que la consulta.
+
+* CSV: `text/csv; charset=utf-8` con BOM; columnas `folio, tipo_dano, ubicacion, colonia, estado, fecha_creacion, fecha_actualizacion`.
+* XML: `application/xml`, validado contra `docs/esquemas/reportes_v1.xsd` (`<reportes version total generado zona_horaria><reporte>…</reporte></reportes>`).
+* Cabeceras: `Content-Disposition: attachment`, `X-Total-Registros`, `X-Registros-Exportados` (tope 50 000).
+
+### 10.5 `POST /api/v1/admin/catalogos/importar-xml` (extra 4.4)
+
+Sólo `coordinador`. `multipart/form-data` con el campo `archivo` (XML ≤ 2 MB validado contra `docs/esquemas/catalogos_v1.xsd`).
+
+| Código | Cuándo |
+|--------|--------|
+| `200` | `{ sectores_creados, sectores_actualizados, colonias_creadas, colonias_actualizadas, mensaje }`. Idempotente. |
+| `401` / `403` | Sin sesión / rol distinto de coordinador. |
+| `413` | Archivo mayor de 2 MB. |
+| `422 XML_INVALIDO` | Vacío, mal formado, con `DOCTYPE`, fuera del XSD o con integridad referencial rota. `detalles[]` trae `linea`, `campo` y `mensaje`. No se importa nada. |

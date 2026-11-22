@@ -51,6 +51,8 @@ services:
       GEOCODING_API_URL: ${GEOCODING_API_URL:-https://us1.locationiq.com/v1}
       GEOCODING_API_KEY: ${GEOCODING_API_KEY:-}
       GEOCODING_TIMEOUT_SECONDS: ${GEOCODING_TIMEOUT_SECONDS:-5}
+      # HU-02.4: fotografías de reportes en un volumen persistente (sobreviven a recrear el contenedor).
+      UPLOADS_DIR: /srv/uploads
       SEED_PASSWORD: ${SEED_PASSWORD:-Juarez2026}
       RUN_SEED: ${RUN_SEED:-true}
     # 1) migraciones  2) datos semilla (idempotentes)  3) API
@@ -62,6 +64,8 @@ services:
         alembic -c db/alembic.ini upgrade head
         if [ "$${RUN_SEED}" = "true" ]; then python db/seed.py; fi
         exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - uploads:/srv/uploads
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -88,3 +92,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:
