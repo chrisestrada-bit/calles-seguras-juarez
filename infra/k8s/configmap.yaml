@@ -1,0 +1,32 @@
+# Configuración NO secreta. Los secretos (contraseñas, JWT, llaves de API) van en el Secret
+# `calles-seguras-secretos` (ver secret.example.yaml); nunca aquí.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: calles-seguras-config
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/part-of: calles-seguras-juarez
+data:
+  # --- Base de datos (el host `postgres` es el Service de services.yaml) ---
+  POSTGRES_DB: calles_seguras
+  POSTGRES_USER: csj_app
+
+  # --- Backend (FastAPI) ---
+  APP_ENV: production
+  APP_TIMEZONE: America/Ciudad_Juarez
+  JWT_ALGORITHM: HS256
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  # Único origen permitido por CORS. Debe ser EXACTAMENTE la URL con la que abres el frontend.
+  # Con `kubectl port-forward svc/frontend 5173:80` es http://localhost:5173 (ver docs/kubernetes.md).
+  FRONTEND_URL: http://localhost:5173
+  UPLOADS_DIR: /srv/uploads
+  # `true` carga los datos de prueba (idempotentes) al iniciar. Pon `false` en un entorno real.
+  RUN_SEED: "true"
+  WEATHER_API_URL: https://api.open-meteo.com/v1/forecast
+  WEATHER_CACHE_TTL_MINUTES: "30"
+  WEATHER_TIMEOUT_SECONDS: "5"
+  GEOCODING_API_URL: https://us1.locationiq.com/v1
+  GEOCODING_TIMEOUT_SECONDS: "5"
+  ROUTING_API_URL: https://router.project-osrm.org
+  ROUTING_TIMEOUT_SECONDS: "6"

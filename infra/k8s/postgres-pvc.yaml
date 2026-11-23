@@ -1,0 +1,29 @@
+# Volúmenes persistentes: los datos de PostgreSQL y las fotografías de los reportes (HU-02.4) sobreviven a reinicios y
+# recreaciones de los pods. Usan la StorageClass por defecto del clúster (kind, minikube y k3d incluyen una).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-datos
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: calles-seguras-juarez
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-fotos
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: calles-seguras-juarez
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

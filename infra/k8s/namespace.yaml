@@ -1,0 +1,8 @@
+# Espacio de nombres propio: todo el despliegue vive aquí y se limpia con un solo comando
+# (kubectl delete namespace calles-seguras).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: calles-seguras
+  labels:
+    app.kubernetes.io/part-of: calles-seguras-juarez

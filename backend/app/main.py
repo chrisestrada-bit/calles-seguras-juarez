@@ -87,5 +87,6 @@ for sub in (operacion.cuadrillas, operacion.enlace, operacion.perfil, operacion.
 
 
 @app.get("/salud", tags=["salud"], summary="Verificación de disponibilidad")
+@app.get("/health", tags=["salud"], summary="Verificación de disponibilidad (alias de /salud para Kubernetes)")
 def salud() -> dict[str, str]:
     return {"estado": "ok"}

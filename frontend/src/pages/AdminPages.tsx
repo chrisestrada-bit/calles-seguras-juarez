@@ -19,6 +19,7 @@ function TransitionForm({ report, onComplete }: { report: ReporteModeracionResum
   if (!report.transiciones_disponibles.length) return <p className="field-help">Sin transiciones disponibles para tu rol.</p>;
   const submit = async (event: FormEvent) => { event.preventDefault(); setError(''); if (next === 'Rechazado' && !motivoId) { setError('Elige el motivo del rechazo del catálogo.'); return; } setBusy(true); try { const response = await api.post<TransicionResponse>(`/api/v1/moderacion/reportes/${encodeURIComponent(report.folio)}/transiciones`, { estado_nuevo: next, motivo_id: next === 'Rechazado' ? Number(motivoId) : null, motivo: next === 'Rechazado' && reason.trim() ? reason.trim() : null, fecha_programada: scheduled || null, fecha_reparacion: repaired || null }); onComplete(response); } catch (exception) { setError(exception instanceof ApiError ? exception.message : 'No fue posible actualizar el reporte.'); } finally { setBusy(false); } };
   return (
+    <>
     <form className="admin-action" onSubmit={submit}>
       <label>Acción<select value={next} onChange={(event) => setNext(event.target.value as EstadoReporte)}>{report.transiciones_disponibles.map((state) => <option key={state}>{state}</option>)}</select></label>
       {next === 'Rechazado' && <><label>Motivo del catálogo<select required value={motivoId} onChange={(event) => setMotivoId(event.target.value)}><option value="">{motivos ? 'Elige un motivo' : 'Cargando motivos…'}</option>{(motivos ?? []).map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></label>{motivosError && <ErrorMessage message={motivosError} />}<label>Detalle (opcional)<textarea maxLength={300} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Agrega contexto para la persona que reportó" /></label></>}
@@ -26,8 +27,9 @@ function TransitionForm({ report, onComplete }: { report: ReporteModeracionResum
       {next === 'Reparado' && <label>Fecha de reparación<input required type="date" value={repaired} onChange={(event) => setRepaired(event.target.value)} /></label>}
       {error && <ErrorMessage message={error} />}
       <button className={`button ${next === 'Rechazado' ? 'button--danger' : 'button--primary'}`} disabled={busy} type="submit">{busy ? 'Guardando…' : 'Aplicar acción'}</button>
-      {report.estado === 'Recibido' && report.tipo_dano !== 'Encharcamiento' && <FusionarDialog folioSecundario={report.folio} onDone={(r) => onComplete({ folio: r.folio_secundario, estado_anterior: 'Recibido', estado: 'Rechazado', fecha_reparacion: null, longevidad_dias: null, registrado_en: r.registrado_en, mensaje: `${r.mensaje} Se sumaron ${r.confirmaciones_transferidas} confirmación(es) al principal.` })} />}
     </form>
+    {report.estado === 'Recibido' && report.tipo_dano !== 'Encharcamiento' && <FusionarDialog folioSecundario={report.folio} onDone={(r) => onComplete({ folio: r.folio_secundario, estado_anterior: 'Recibido', estado: 'Rechazado', fecha_reparacion: null, longevidad_dias: null, registrado_en: r.registrado_en, mensaje: `${r.mensaje} Se sumaron ${r.confirmaciones_transferidas} confirmación(es) al principal.` })} />}
+    </>
   );
 }
 
