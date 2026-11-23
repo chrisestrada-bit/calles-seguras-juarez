@@ -14,6 +14,10 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("JWT_SECRET_KEY", "clave-de-pruebas-clave-de-pruebas-1234567890")
+# Toda la suite llega desde la misma IP («testclient»): los límites por IP se elevan aquí y las pruebas que los
+# verifican los bajan explícitamente (test_auditoria_final.py).
+for _var in ("LIMITE_REGISTROS_POR_HORA_IP", "LIMITE_LOGIN_FALLIDOS_POR_IP"):
+    os.environ.setdefault(_var, "1000000")
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://postgres@127.0.0.1:5432/calles_seguras_test")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 

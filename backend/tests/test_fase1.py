@@ -12,8 +12,20 @@ from app.services import exportacion, fotos
 from tests.conftest import crear_reporte, motivo_id, desplazar, payload_bache, payload_enc, punto_unico
 
 API = "/api/v1"
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
-JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+# Imágenes con estructura válida y sin metadatos: el servidor las guarda byte por byte. Desde la auditoría final (A3)
+# la estructura se recorre para quitar EXIF/GPS, así que los bytes de relleno ya no pasan por imagen.
+PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c63f8cfc0f01f00050001ffabce36890000000049454e44ae426082"
+)
+JPG = (
+    b"\xff\xd8"
+    + b"\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+    + b"\xff\xdb\x00\x43\x00" + bytes(range(1, 65))
+    + b"\xff\xda\x00\x08\x01\x01\x00\x00\x3f\x00"
+    + b"\x12\x34\xff\x00\x56"
+    + b"\xff\xd9"
+)
 
 
 @pytest.fixture(autouse=True)
