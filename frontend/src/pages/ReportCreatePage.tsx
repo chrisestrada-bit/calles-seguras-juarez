@@ -1,6 +1,6 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../context/useAuth';
-import { api, ApiError } from '../services/api';
+import { api, ApiError, erroresPorCampo, mensajeDeError } from '../services/api';
 import { agruparPorSector, cargarColonias, etiquetaColonia } from '../services/catalogos';
 import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import type {
@@ -24,10 +24,6 @@ const enJuarez = ({ latitud, longitud }: Ubicacion) => latitud >= LIMITES.latitu
 const cargarCatalogo = () => cargarColonias();
 const cargarTipos = (clave: string) => api.get<TiposDanoResponse>(clave);
 
-function ErrorApiTexto({ error }: { error: unknown }) {
-  return <>{error instanceof ApiError ? error.message : 'No fue posible completar la solicitud. Intenta de nuevo.'}</>;
-}
-
 export function ReportCreatePage() {
   const { autenticado, usuario } = useAuth();
   const { enLinea } = useEnLinea();
@@ -44,7 +40,11 @@ export function ReportCreatePage() {
   const [forzarNuevo, setForzarNuevo] = useState(false);
   const [detalle, setDetalle] = useState({ tamano: '', profundidad: '', carril_afectado: '', esta_senalizado: '', nivel_agua: '', hay_riesgo_personas_vehiculos: '', referencia: '', descripcion: '' });
   const [error, setError] = useState('');
-  const mostrarError = (e: unknown) => setError(e instanceof ApiError ? e.message : 'No fue posible completar la solicitud. Intenta de nuevo.');
+  const [erroresCampo, setErroresCampo] = useState<Record<string, string>>({});
+  const bannerError = useRef<HTMLDivElement>(null);
+  // Un error de envío puede quedar fuera de pantalla (el banner está arriba): se lleva a la vista para que no parezca que el botón no hizo nada.
+  useEffect(() => { if (error) bannerError.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, [error]);
+  const mostrarError = (e: unknown) => { setError(mensajeDeError(e)); setErroresCampo(erroresPorCampo(e)); };
   const [exito, setExito] = useState<ReportePublico | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [fotos, setFotos] = useState<File[]>([]); // HU-02.4: se suben justo después de crear o confirmar
@@ -119,16 +119,17 @@ export function ReportCreatePage() {
   };
 
   const confirmar = async (candidato: CandidatoCercano) => {
-    setError(''); setAvisoFotos('');
+    if (enviando) return;
+    setError(''); setErroresCampo({}); setAvisoFotos(''); setEnviando(true);
     try {
       await api.post(`/api/v1/reportes/${encodeURIComponent(candidato.folio)}/confirmaciones`, { tipo: tipo === 'Encharcamiento' ? 'sigue_ahi' : 'confirmacion_dano' });
       await adjuntarFotos(candidato.folio);
       setExito({ folio: candidato.folio } as ReportePublico);
-    } catch (e) { mostrarError(e); }
+    } catch (e) { mostrarError(e); } finally { setEnviando(false); }
   };
 
   const enviar = async (evento: FormEvent) => {
-    evento.preventDefault(); setError(''); setExito(null); setAvisoFotos('');
+    evento.preventDefault(); setError(''); setErroresCampo({}); setExito(null); setAvisoFotos('');
     if (!ubicacion || !enJuarez(ubicacion)) { setError('Selecciona una ubicación dentro de los límites de Ciudad Juárez.'); return; }
     if (!coloniaId) { setError('Selecciona la colonia del reporte.'); return; }
     const base = { tipo_dano: tipoElegido, ...ubicacion, colonia_id: Number(coloniaId), calle: calle.trim(), referencia: detalle.referencia.trim() || undefined, descripcion: detalle.descripcion.trim() || undefined, forzar_nuevo: forzarNuevo };
@@ -158,7 +159,7 @@ export function ReportCreatePage() {
 
   const hayDuplicados = candidatos.length > 0 && !forzarNuevo;
   return <main className="report-page"><section className="report-intro"><h1>Reportar un daño</h1><p>Ayúdanos a identificar baches, alcantarillas sin tapa y encharcamientos en Ciudad Juárez.</p></section>
-    {error && <div className="form-error" role="alert"><ErrorApiTexto error={error} /></div>}
+    {error && <div className="form-error" role="alert" ref={bannerError} tabIndex={-1}><p>{error}</p>{Object.keys(erroresCampo).length > 0 && <ul>{Object.entries(erroresCampo).map(([campo, mensaje]) => <li key={campo}><strong>{campo.replace(/_/g, ' ')}:</strong> {mensaje}</li>)}</ul>}</div>}
     {guardadoOffline ? <section className="success-panel" aria-live="polite"><span className="success-panel__icon"><Icon name="inbox" size={32} /></span><h2>Guardado para enviar</h2><p>No hay conexión. Guardamos tu reporte en este dispositivo y lo enviaremos automáticamente al recuperar la red, sin duplicarlo. Verás el estado en la barra superior.</p><a className="button button--primary" href="/">Volver al inicio</a></section> : exito ? <section className="success-panel" aria-live="polite"><span className="success-panel__icon"><Icon name="checkCircle" size={32} /></span><h2>Reporte registrado</h2><p>Tu folio es <strong>{exito.folio}</strong>. Gracias por ayudar a cuidar nuestras calles.</p>{avisoFotos && <p className="field-help" role="status"><Icon name="camera" size={16} />{avisoFotos}</p>}<a className="button button--primary" href={`/reportes/${encodeURIComponent(exito.folio)}`}>Ver reporte<Icon name="arrowRight" size={18} /></a></section> : <>
       <section className="report-section" aria-labelledby="tipo-titulo"><h2 id="tipo-titulo">1. ¿Qué observaste?</h2>{catalogoTipos.datos && tiposActivos.length === 0 && <p className="form-error" role="alert">Por ahora no hay tipos de daño disponibles para reportar.</p>}<div className="type-options">{tiposActivos.map((opcion) => <label className={`type-option${tipoElegido === opcion ? ' type-option--selected' : ''}`} key={opcion}><input type="radio" name="tipo_dano" checked={tipoElegido === opcion} onChange={() => cambiarTipo(opcion)} /><span className={`type-option__icon type-option__icon--${TIPO_TONO[opcion]}`}><TypeGlyph tipo={opcion} size={30} /></span><span className="type-option__text"><span>{nombreTipo(opcion)}</span><small>{TIPO_AYUDA[opcion]}</small></span></label>)}</div></section>
       <section className="report-section" aria-labelledby="ubicacion-titulo"><h2 id="ubicacion-titulo">2. ¿Dónde está?</h2><form className="location-search" onSubmit={buscarDireccion}><label htmlFor="direccion">Buscar por dirección, calle, cruce o código postal</label><div className="inline-form"><div className="input-icon"><Icon name="search" size={18} /><input id="direccion" value={consulta} onChange={(e) => setConsulta(e.target.value)} placeholder="Ej. Tecnológico y Ejército Nacional o 32310" /></div><button className="button button--primary" disabled={cargandoUbicacion}>{cargandoUbicacion ? 'Buscando…' : 'Buscar'}</button></div></form><button className="button button--secondary" type="button" onClick={usarGps}><Icon name="locate" size={18} />Usar mi ubicación GPS</button>{ubicacion && <p className="location-readout" role="status"><Icon name="pin" size={18} /><span>Punto: {ubicacion.latitud.toFixed(6)}, {ubicacion.longitud.toFixed(6)}. {ubicacionEstado}</span></p>}{ubicacionEstado && !ubicacion && <p className="field-help" role="status">{ubicacionEstado}</p>}{resultados.length > 0 && <ul className="search-results" aria-label="Resultados de dirección">{resultados.map((resultado) => <li key={`${resultado.etiqueta}-${resultado.ubicacion.latitud}`}><button type="button" onClick={() => seleccionarUbicacion(resultado)}><Icon name="pin" size={18} /><strong>{resultado.etiqueta}</strong><span>{resultado.precision}</span></button></li>)}</ul>}<label htmlFor="colonia">Colonia <span aria-hidden="true">*</span></label><select id="colonia" value={coloniaId} onChange={(e) => setColoniaId(e.target.value)} required aria-describedby={catalogo.estado === 'error' ? 'colonia-error' : undefined}><option value="">{catalogo.estado === 'cargando' ? 'Cargando colonias…' : 'Selecciona la colonia'}</option>{agruparPorSector(colonias).map(([sector, lista]) => <optgroup key={sector} label={sector}>{lista.map((colonia) => <option key={colonia.id} value={colonia.id}>{etiquetaColonia(colonia)}</option>)}</optgroup>)}</select>{catalogo.estado === 'error' && <p id="colonia-error" className="field-help" role="alert">{catalogo.error}</p>}<label htmlFor="calle">Calle</label><input id="calle" value={calle} onChange={(e) => setCalle(e.target.value)} minLength={3} maxLength={150} required placeholder="Ej. Avenida Tecnológico" />{revisandoDuplicados && <p className="field-help" role="status">Revisando reportes cercanos…</p>}{cercanos.estado === 'error' && <p className="form-error" role="alert">{cercanos.error}</p>}{cercanos.estado === 'listo' && candidatos.length === 0 && <p className="form-success" role="status">No encontramos reportes abiertos o vigentes en el radio correspondiente.</p>}{candidatos.length > 0 && <div className="duplicate-box" role="alert"><h3><Icon name="alert" size={20} />Encontramos un reporte cercano</h3><p>Hay un reporte a menos de {radio} metros. Puedes confirmarlo o indicar que el daño es distinto.</p>{candidatos.map((candidato) => <article className="duplicate-card" key={candidato.folio}><div><strong>{candidato.folio}</strong><span>{candidato.calle} · {candidato.distancia_metros.toFixed(1)} m</span></div>{candidato.es_mio ? <p className="field-help">Este reporte es tuyo y no puedes confirmarlo.</p> : candidato.ya_confirmado_por_mi ? <p className="field-help">Ya confirmaste este reporte.</p> : <button className="button button--secondary" type="button" onClick={() => void confirmar(candidato)}>Confirmar existente</button>}</article>)}{!forzarNuevo && <div className="duplicate-box__photos"><h4>Si confirmas, puedes adjuntar fotografías</h4><FotoPicker archivos={fotos} onChange={setFotos} /></div>}{!forzarNuevo && <button className="button button--quiet" type="button" onClick={() => setForzarNuevo(true)}>Es un daño distinto, crear reporte nuevo</button>}{forzarNuevo && <p className="field-help">Crearás un reporte nuevo y quedará registrado como daño distinto.</p>}</div>}</section>

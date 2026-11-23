@@ -46,6 +46,28 @@ function mensajePorEstado(status: number, fallback: string): string {
   }
 }
 
+/** Texto legible de un tiempo de espera (Retry-After, en segundos). */
+export function textoEspera(segundos: number): string {
+  if (segundos < 60) return `${segundos} segundo${segundos === 1 ? '' : 's'}`;
+  const minutos = Math.ceil(segundos / 60);
+  return `${minutos} minuto${minutos === 1 ? '' : 's'}`;
+}
+
+/** Mensaje en español para cualquier error de la API; en 429 agrega el tiempo de espera si el servidor lo indicó. */
+export function mensajeDeError(e: unknown, fallback = 'No fue posible completar la solicitud. Intenta de nuevo.'): string {
+  if (!(e instanceof ApiError)) return fallback;
+  if (e.status === 429 && e.retryAfter) return `${e.message} Podrás intentarlo de nuevo en ${textoEspera(e.retryAfter)}.`;
+  return e.message;
+}
+
+/** Errores de validación (422) por campo: { campo: mensaje }. */
+export function erroresPorCampo(e: unknown): Record<string, string> {
+  if (!(e instanceof ApiError)) return {};
+  const salida: Record<string, string> = {};
+  for (const d of e.detalles) if (d.campo && !(d.campo in salida)) salida[d.campo] = d.mensaje;
+  return salida;
+}
+
 async function leerError(response: Response): Promise<ErrorApi | undefined> {
   try {
     const body = await response.json() as RespuestaError;
