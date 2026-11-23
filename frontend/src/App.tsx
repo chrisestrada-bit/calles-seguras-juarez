@@ -4,6 +4,12 @@ import { Icon } from './components/Icon';
 import { RainBanner } from './components/RainBanner';
 import { BannerRed } from './components/BannerRed';
 import { PuntosRecurrentesPage } from './pages/PuntosRecurrentesPage';
+import { AdminCatalogosPage } from './pages/AdminCatalogosPage';
+import { CuadrillasPage } from './pages/CuadrillasPage';
+import { EnlacePage } from './pages/EnlacePage';
+import { PerfilPage } from './pages/PerfilPage';
+import { ResumenColoniaPage } from './pages/ResumenColoniaPage';
+import { TrayectoPage } from './pages/TrayectoPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { PublicHomePage } from './pages/PublicHomePage';
@@ -21,7 +27,7 @@ function App() {
   useAuth();
   const path = window.location.pathname;
   const folioEdicion = path === '/reportar' ? new URLSearchParams(window.location.search).get('editar') : null;
-  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path === '/aviso-de-privacidad' ? <PrivacyNoticePage /> : folioEdicion ? <ReportEditPage folio={folioEdicion} /> : path === '/reportar' ? <ReportCreatePage /> : path === '/mis-reportes' ? <MyReportsPage /> : path === '/moderacion' ? <ModerationPage /> : path === '/coordinacion' ? <CoordinationPage /> : path === '/puntos-recurrentes' ? <PuntosRecurrentesPage /> : path === '/admin/colonias' ? <AdminColoniasPage /> : path === '/admin/usuarios' ? <AdminUsuariosPage /> : path === '/mi-zona' ? <ZonePage /> : path === '/dashboard' || path === '/tablero' ? <DashboardPage /> : path === '/auditoria' ? <AuditPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
+  const contenido = path === '/login' ? <LoginPage /> : path === '/registro' ? <RegisterPage /> : path === '/aviso-de-privacidad' ? <PrivacyNoticePage /> : folioEdicion ? <ReportEditPage folio={folioEdicion} /> : path === '/reportar' ? <ReportCreatePage /> : path === '/mis-reportes' ? <MyReportsPage /> : path === '/moderacion' ? <ModerationPage /> : path === '/coordinacion' ? <CoordinationPage /> : path === '/puntos-recurrentes' ? <PuntosRecurrentesPage /> : path === '/cuadrillas' ? <CuadrillasPage /> : path === '/enlace' ? <EnlacePage /> : path === '/admin/catalogos' ? <AdminCatalogosPage /> : path === '/perfil' ? <PerfilPage /> : path === '/trayecto' ? <TrayectoPage /> : path === '/resumen-colonia' ? <ResumenColoniaPage /> : path === '/admin/colonias' ? <AdminColoniasPage /> : path === '/admin/usuarios' ? <AdminUsuariosPage /> : path === '/mi-zona' ? <ZonePage /> : path === '/dashboard' || path === '/tablero' ? <DashboardPage /> : path === '/auditoria' ? <AuditPage /> : path.startsWith('/reportes/') ? <ReportDetailPage folio={decodeURIComponent(path.split('/')[2] ?? '')} /> : <PublicHomePage />;
   return (
     <>
     <SiteHeader /><BannerRed /><RainBanner />{contenido}<footer className="site-footer">

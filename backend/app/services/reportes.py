@@ -24,7 +24,7 @@ from app.models import (
 )
 from app.schemas.comun import ParametrosPagina
 from app.schemas.reportes import BacheIn, EncharcamientoIn, ReporteCrear, ReporteEditar
-from app.services import geo
+from app.services import catalogos_admin, geo
 from app.services.folios import generar_folio
 from app.services.historial import fijar_contexto
 from app.services.presentacion import etiqueta_publica
@@ -152,6 +152,7 @@ def crear_reporte(db: Session, usuario: Usuario, payload: ReporteCrear) -> Repor
         previo._reutilizado = True  # type: ignore[attr-defined]
         return previo
     tipo = TipoDano(payload.tipo_dano)
+    catalogos_admin.exigir_tipo_activo(db, tipo)  # HU-06.3: no se aceptan tipos desactivados
     verificar_territorio(payload.latitud, payload.longitud)  # RN-01 (defensa en profundidad)
 
     colonia = db.get(Colonia, payload.colonia_id)
@@ -317,9 +318,12 @@ def listar_publicos(
     *,
     orden: str,
     pag: ParametrosPagina,
+    prioridad_colonias: list[int] | None = None,
     **filtros,
 ) -> tuple[list[Reporte], int]:
+    """`prioridad_colonias` (HU-01.4): los reportes de esas colonias van primero, sin ocultar el resto."""
     condiciones = condiciones_publicas(**filtros)
+    prioridad = [case((Reporte.colonia_id.in_(prioridad_colonias), 0), else_=1)] if prioridad_colonias else []
     total = db.scalar(
         select(func.count()).select_from(Reporte).join(Colonia, Reporte.colonia_id == Colonia.id).where(*condiciones)
     ) or 0
@@ -327,7 +331,7 @@ def listar_publicos(
         select(Reporte)
         .join(Colonia, Reporte.colonia_id == Colonia.id)
         .where(*condiciones)
-        .order_by(*_ORDENES[orden](), Reporte.id.desc())
+        .order_by(*prioridad, *_ORDENES[orden](), Reporte.id.desc())
         .limit(pag.por_pagina)
         .offset(pag.offset)
     ).all()
@@ -430,3 +434,14 @@ def editar_reporte(db: Session, usuario: Usuario, folio: str, datos: ReporteEdit
     db.commit()
     db.refresh(reporte)
     return reporte
+
+
+def anotar_principales(db: Session, filas: list[Reporte]) -> None:
+    """HU-05.3: deja en cada reporte fusionado el folio de su reporte principal (para «Mis reportes»)."""
+    ids = {r.reporte_principal_id for r in filas if r.reporte_principal_id}
+    if not ids:
+        return
+    folios = dict(db.execute(select(Reporte.id, Reporte.folio).where(Reporte.id.in_(ids))).all())
+    for r in filas:
+        if r.reporte_principal_id:
+            r._folio_principal = folios.get(r.reporte_principal_id)  # type: ignore[attr-defined]

@@ -7,6 +7,7 @@ class RolUsuario(enum.StrEnum):
     CIUDADANO = "ciudadano"
     MODERADOR = "moderador"
     COORDINADOR = "coordinador"
+    ENLACE_MUNICIPAL = "enlace_municipal"  # HU-05.5: autoridad que reporta el avance de sus cuadrillas
 
 
 class TipoDano(enum.StrEnum):

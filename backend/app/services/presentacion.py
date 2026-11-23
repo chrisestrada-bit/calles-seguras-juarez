@@ -164,5 +164,6 @@ def a_mi_reporte(r: Reporte, hoy: date | None = None) -> MiReporte:
         colonia=ColoniaRef(id=r.colonia.id, nombre=r.colonia.nombre),
         created_at=r.created_at,
         motivo_rechazo=r.motivo_rechazo,
+        folio_principal=getattr(r, "_folio_principal", None),
         longevidad_dias=longevidad_dias(r, hoy),
     )

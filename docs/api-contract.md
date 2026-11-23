@@ -1466,3 +1466,46 @@ El cliente responde `{"tipo":"pong"}` a cada `ping`. Un `Origin` distinto de `FR
 ### 11.5 `POST /api/v1/reportes` con `idempotency_key` (HU-08.4)
 
 Campo opcional `idempotency_key` (UUID) en el cuerpo de cualquiera de los tres tipos. Primera vez: `201`. Reenvío con la misma llave de la misma persona: **`200`** con el mismo reporte (mismo folio), sin crear otro ni consumir el límite de 10/hora. Llaves iguales de personas distintas no se relacionan. Una llave que no es UUID responde `422`. La llave nunca aparece en las respuestas.
+
+---
+
+## 12. Extensiones opcionales · Fase 3
+
+### 12.1 Cambio en `POST /api/v1/moderacion/reportes/{folio}/transiciones` (HU-06.3)
+
+Para `estado_nuevo: "Rechazado"` es obligatorio `motivo_id` (motivo **activo** de `GET /api/v1/catalogos/motivos-rechazo`); `motivo` pasa a ser un detalle opcional (máx. 300). Sin `motivo_id` → `422`; inactivo o inexistente → `422 MOTIVO_NO_AUTORIZADO`.
+
+### 12.2 `POST /api/v1/moderacion/reportes/fusionar` (HU-05.3 · moderador y coordinador)
+
+Cuerpo `{ "folio_principal": "BCH-2026-000418", "folio_secundario": "BCH-2026-000421" }`. Respuesta `200`: `{ folio_principal, folio_secundario, estado_secundario: "Rechazado", confirmaciones_transferidas, confirmaciones_principal, registrado_en, mensaje }`. Errores: `404` folio inexistente, `409 SECUNDARIO_NO_FUSIONABLE` / `PRINCIPAL_NO_VALIDO`, `422 FUSION_INVALIDA` (mismo folio, tipos distintos o encharcamientos). `MiReporte` y el detalle de moderación incluyen `folio_principal`.
+
+### 12.3 Cuadrillas (HU-05.4 · sólo coordinador)
+
+| Ruta | Descripción |
+|------|-------------|
+| `GET /cuadrillas?solo_activas=` · `POST /cuadrillas` | Lista (con `pendientes`) y alta `{ nombre, responsable, telefono_contacto }`. Nombre repetido → `409`. |
+| `GET /cuadrillas/{id}` | Detalle con `enlaces` y `baches` (activos e historial, sin datos del ciudadano). |
+| `PATCH /cuadrillas/{id}` | Editar o `{ "activa": false }`. |
+| `DELETE /cuadrillas/{id}` | `204`; `409 CUADRILLA_CON_PENDIENTES` o `409 CUADRILLA_CON_HISTORIAL`. |
+| `POST /cuadrillas/{id}/asignaciones` | `{ folio, fecha_programada }`: `Validado → Programado` (o reasignación). `409` si no está `Validado`/`Programado` o la cuadrilla está inactiva; `422` fecha pasada. |
+| `POST /cuadrillas/{id}/enlaces` · `DELETE /cuadrillas/{id}/enlaces/{usuario_id}` | Vincular/desvincular cuentas `enlace_municipal` (`422 ROL_INCOMPATIBLE` para otros roles). |
+
+### 12.4 Enlace municipal (HU-05.5 · sólo `enlace_municipal`)
+
+`GET /enlace/reportes?incluir_reparados=` → `{ cuadrillas, datos: [BacheAsignado] }`; `GET /enlace/reportes/{folio}`; `POST /enlace/reportes/{folio}/avance` con `{ estado_nuevo: "En reparación" | "Reparado", fecha_reparacion? }`. Ajenos → `403 REPORTE_AJENO`; cuenta suspendida → `403 CUENTA_SUSPENDIDA`; paso inválido → `400`; fecha inválida → `422`.
+
+### 12.5 Catálogos (HU-06.3)
+
+Públicos: `GET /catalogos/tipos-dano` (sólo activos, ahora con `nombre` y `descripcion`) y `GET /catalogos/motivos-rechazo` (activos). Coordinador: `GET|POST /admin/catalogos/tipos-dano`, `PATCH /admin/catalogos/tipos-dano/{id}`, `GET|POST /admin/catalogos/motivos-rechazo`, `PATCH /admin/catalogos/motivos-rechazo/{id}` (`{ nombre?, descripcion?, activo? }`). No hay `DELETE`.
+
+### 12.6 Colonias de interés (HU-01.4 · con sesión)
+
+`GET /perfil/colonias-favoritas` → `{ maximo: 20, datos: [{ colonia, sector, codigo_postal, activa, agregada_en }] }`; `POST` `{ colonia_id }` → `201` (o `200` si ya estaba; `422` si la colonia no está activa); `DELETE /perfil/colonias-favoritas/{colonia_id}` → `204` / `404`. En `GET /reportes` con sesión cada elemento puede traer `en_tus_colonias`.
+
+### 12.7 `GET /api/v1/trayecto/revisar` (HU-04.6 · público)
+
+Parámetros `origen_latitud`, `origen_longitud`, `destino_latitud`, `destino_longitud` (RN-01). Respuesta: `{ origen, destino, radio_metros: 100, ruta: { fuente: "osrm" | "linea_recta", degradado, mensaje, distancia_metros, duracion_segundos, puntos: [[lat, lon], …] }, total, datos: [{ folio, calle, colonia, ubicacion, nivel_agua, es_intransitable, hay_riesgo_personas_vehiculos, distancia_metros, vigente_hasta }], mensaje }`. Con `total = 0`, `mensaje` es «No hay encharcamientos reportados cerca del trayecto».
+
+### 12.8 `GET /api/v1/publico/colonias/{colonia_id}/resumen` (HU-07.2 · público)
+
+`{ colonia, sector, codigo_postal, activa, abiertos, abiertos_por_estado, reparados, tiempo_promedio_reparacion_dias, encharcamientos_activos, criterios, actualizado_en }`. `404` si la colonia no existe.

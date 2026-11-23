@@ -9,7 +9,7 @@ import { EmptyState, TableSkeleton } from '../components/ui';
 import type { CambiarEstadoResponse, CambiarRolResponse, RespuestaPaginada, Rol, UsuarioAdmin } from '../types/api';
 
 const POR_PAGINA = 20;
-const ROLES: Array<Exclude<Rol, 'visitante'>> = ['ciudadano', 'moderador', 'coordinador'];
+const ROLES: Array<Exclude<Rol, 'visitante'>> = ['ciudadano', 'moderador', 'coordinador', 'enlace_municipal'];
 const consulta = (valores: Record<string, string | number>) => Object.entries(valores).filter(([, v]) => v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
 const fecha = fechaDeInstante; // RN-02
 

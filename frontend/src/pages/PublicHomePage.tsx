@@ -75,8 +75,10 @@ async function consultar(clave: string): Promise<RespuestaPaginada<ReporteResume
 const cargarCatalogo = () => cargarColonias();
 
 export function PublicHomePage() {
-  const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS); // lo que se está escribiendo
-  const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS); // lo que se consultó
+  // /?colonia=ID (enlace desde /resumen-colonia) abre la consulta ya filtrada.
+  const coloniaUrl = new URLSearchParams(window.location.search).get('colonia') ?? '';
+  const [borrador, setBorrador] = useState<Filtros>({ ...SIN_FILTROS, colonia: coloniaUrl }); // lo que se está escribiendo
+  const [aplicados, setAplicados] = useState<Filtros>({ ...SIN_FILTROS, colonia: coloniaUrl }); // lo que se consultó
   const [pagina, setPagina] = useState(1);
   const [vista, setVista] = useState<'lista' | 'mapa'>('lista');
   const [exportando, setExportando] = useState<'csv' | 'xml' | null>(null);
@@ -203,10 +205,37 @@ export function PublicHomePage() {
         {vista === 'mapa' ? <Suspense fallback={<div className="map-state" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}><MapaReportes filtros={paramsFiltros(aplicados).toString()} onVerLista={() => setVista('lista')} vivos={enVivo.vivos} filtrosLista={aplicados} /></Suspense> : <>
         {cargando ? <ReportGridSkeleton count={6} /> : error ? <div className="form-error" role="alert">{error}</div> : reportes.length === 0
           ? <EmptyState art="search" title="No hay reportes que coincidan con tus filtros" action={<a className="button button--primary" href="/reportar"><Icon name="plus" size={18} />Reportar un daño</a>}>{hayFiltros ? 'Prueba con otra calle, otra colonia u otras fechas, o usa «Limpiar filtros».' : 'Aún no hay reportes públicos. Sé la primera persona en reportar un daño.'}</EmptyState>
-          : <div className="report-grid">{reportes.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>}
+          : <ListaConTusColonias reportes={reportes} />}
         <Pagination page={pagina} total={totalPaginas} onChange={setPagina} label="Paginación de reportes" />
         </>}
       </section>
     </main>
+  );
+}
+
+/** HU-01.4: con colonias de interés, primero «Tus colonias» y después el resto de la ciudad (nada se oculta). */
+function ListaConTusColonias({ reportes }: { reportes: ReporteResumenPublico[] }) {
+  const tuyas = reportes.filter((r) => r.en_tus_colonias);
+  if (tuyas.length === 0 || tuyas.length === reportes.length && !reportes.some((r) => r.en_tus_colonias === false)) {
+    return <div className="report-grid">{reportes.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>;
+  }
+  const resto = reportes.filter((r) => !r.en_tus_colonias);
+  return (
+    <>
+      <section aria-labelledby="tus-colonias-titulo" className="tus-colonias">
+        <div className="tus-colonias__head">
+          <h3 id="tus-colonias-titulo"><Icon name="star" size={18} />Tus colonias</h3>
+          {resto.length > 0 && <a className="link-button" href="#resto-titulo">Ver el resto de la ciudad ({resto.length})</a>}
+          <a className="link-button" href="/perfil">Editar mis colonias</a>
+        </div>
+        <div className="report-grid">{tuyas.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>
+      </section>
+      {resto.length > 0 && (
+        <section aria-labelledby="resto-titulo">
+          <h3 id="resto-titulo" className="tus-colonias__resto">Resto de la ciudad</h3>
+          <div className="report-grid">{resto.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>
+        </section>
+      )}
+    </>
   );
 }

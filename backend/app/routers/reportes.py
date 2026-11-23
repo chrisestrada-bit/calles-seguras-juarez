@@ -27,7 +27,7 @@ from app.schemas.reportes import (
     ReportePublico,
     ReporteResumenPublico,
 )
-from app.services import confirmaciones, exportacion, fotos, presentacion, recurrentes, reportes, tiempo_real
+from app.services import confirmaciones, exportacion, fotos, perfil_publico, presentacion, recurrentes, reportes, tiempo_real
 from app.services.vigencia import expirar_vencidos
 
 router = APIRouter(prefix="/reportes", tags=["reportes"])
@@ -80,13 +80,20 @@ class FiltrosReportes:
 def listar(
     f: FiltrosReportes = Depends(),
     pag: ParametrosPagina = Depends(),
+    usuario: Usuario | None = Depends(usuario_opcional),
     db: Session = Depends(get_db),
 ) -> dict:
     expirar_vencidos(db)
-    filas, total = reportes.listar_publicos(db, orden=f.orden, pag=pag, **f.filtros)
+    # HU-01.4: con sesión y sin un filtro territorial excluyente, primero los reportes de «Tus colonias».
+    favoritas = [] if f.filtros["colonia_id"] or f.filtros["sector_id"] else perfil_publico.ids_favoritas(db, usuario)
+    filas, total = reportes.listar_publicos(db, orden=f.orden, pag=pag, prioridad_colonias=favoritas, **f.filtros)
     recurrentes.anotar(db, filas)
     conteos = presentacion.conteos_confirmaciones(db, filas)
-    return armar_pagina([presentacion.a_resumen(r, conteos) for r in filas], total, pag)
+    datos = [presentacion.a_resumen(r, conteos) for r in filas]
+    if favoritas:
+        for item, r in zip(datos, filas, strict=True):
+            item.en_tus_colonias = r.colonia_id in favoritas
+    return armar_pagina(datos, total, pag)
 
 
 @router.get(
@@ -246,6 +253,7 @@ def mios(
 ) -> dict:
     expirar_vencidos(db)
     filas, total = reportes.listar_mios(db, usuario, estado=estado, tipo=tipo_dano, pag=pag)
+    reportes.anotar_principales(db, filas)  # HU-05.3
     return armar_pagina([presentacion.a_mi_reporte(r) for r in filas], total, pag)
 
 

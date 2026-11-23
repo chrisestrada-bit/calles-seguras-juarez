@@ -9,7 +9,7 @@ import pytest
 from lxml import etree
 
 from app.services import exportacion, fotos
-from tests.conftest import crear_reporte, desplazar, payload_bache, payload_enc, punto_unico
+from tests.conftest import crear_reporte, motivo_id, desplazar, payload_bache, payload_enc, punto_unico
 
 API = "/api/v1"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -139,7 +139,7 @@ def test_fotos_de_reporte_rechazado_no_se_revelan(client, ciudadano, ciudadanos,
     foto = subir(client, ciudadano, folio, ("x.jpg", JPG, "image/jpeg")).json()["aceptadas"][0]
     r = client.post(
         f"{API}/moderacion/reportes/{folio}/transiciones",
-        json={"estado_nuevo": "Rechazado", "motivo": "Foto sin relación con el reporte"},
+        json={"estado_nuevo": "Rechazado", "motivo_id": motivo_id(client), "motivo": "Foto sin relación con el reporte"},
         headers=moderador.h,
     )
     assert r.status_code == 200, r.text
@@ -173,7 +173,8 @@ def test_mapa_publico_sin_datos_personales_y_mismos_filtros(client, ciudadano, m
     filtros = {"tipo_dano": "Encharcamiento", "solo_vigentes": "true"}
     lista = client.get(f"{API}/reportes", params={**filtros, "por_pagina": 100}).json()
     mapa = client.get(f"{API}/reportes/mapa", params=filtros).json()
-    assert {x["folio"] for x in lista["datos"]} == {x["folio"] for x in mapa["datos"]}
+    # Mismo conjunto: la página de la lista está contenida en el mapa y el total coincide (la BD de pruebas crece).
+    assert {x["folio"] for x in lista["datos"]} <= {x["folio"] for x in mapa["datos"]}
     assert enc["folio"] in {x["folio"] for x in mapa["datos"]}
     assert mapa["total"] == lista["paginacion"]["total"]
 
@@ -183,7 +184,7 @@ def test_mapa_excluye_rechazados_y_valida_filtros(client, ciudadano, moderador):
     rep = crear_reporte(client, ciudadano, payload_bache(client, lat, lon))
     client.post(
         f"{API}/moderacion/reportes/{rep['folio']}/transiciones",
-        json={"estado_nuevo": "Rechazado", "motivo": "No procede"},
+        json={"estado_nuevo": "Rechazado", "motivo_id": motivo_id(client), "motivo": "No procede"},
         headers=moderador.h,
     )
     folios = {m["folio"] for m in client.get(f"{API}/reportes/mapa").json()["datos"]}

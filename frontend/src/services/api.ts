@@ -145,6 +145,7 @@ export const api = {
   post: <T>(path: string, body?: unknown, init?: RequestInit) => apiFetch<T>(path, { ...init, method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   postForm: <T>(path: string, form: FormData, init?: RequestInit) => apiFetch<T>(path, { ...init, method: 'POST', body: form }),
   patch: <T>(path: string, body: unknown, init?: RequestInit) => apiFetch<T>(path, { ...init, method: 'PATCH', body: JSON.stringify(body) }),
+  delete: <T = void>(path: string, init?: RequestInit) => apiFetch<T>(path, { ...init, method: 'DELETE' }),
 };
 
 export { TOKEN_KEY };

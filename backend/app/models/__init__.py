@@ -18,11 +18,25 @@ from app.models.enums import (
 from app.models.foto import ReporteFoto
 from app.models.historial import HistorialEstado
 from app.models.notificacion import Notificacion
+from app.models.operacion import (
+    AsignacionCuadrilla,
+    CatalogoMotivoRechazo,
+    CatalogoTipoDano,
+    ColoniaFavorita,
+    Cuadrilla,
+    UsuarioCuadrilla,
+)
 from app.models.reporte import Reporte
 from app.models.territorio import Colonia, Sector
 from app.models.usuario import Usuario
 
 __all__ = [
+    "AsignacionCuadrilla",
+    "CatalogoMotivoRechazo",
+    "CatalogoTipoDano",
+    "ColoniaFavorita",
+    "Cuadrilla",
+    "UsuarioCuadrilla",
     "Base",
     "CacheClima",
     "CarrilAfectado",

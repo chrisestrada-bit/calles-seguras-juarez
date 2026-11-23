@@ -134,3 +134,9 @@ def crear_reporte(client: TestClient, cuenta: Cuenta, payload: dict) -> dict:
     r = client.post("/api/v1/reportes", json=payload, headers=cuenta.h)
     assert r.status_code == 201, r.text
     return r.json()
+
+
+def motivo_id(client: TestClient, nombre: str = "Información insuficiente") -> int:
+    """HU-06.3: id de un motivo de rechazo activo del catálogo."""
+    motivos = client.get("/api/v1/catalogos/motivos-rechazo").json()["datos"]
+    return next((m["id"] for m in motivos if m["nombre"] == nombre), motivos[0]["id"])

@@ -28,7 +28,7 @@ from app.schemas.moderacion import (
     TransicionIn,
     TransicionOut,
 )
-from app.services import notificaciones, transiciones
+from app.services import catalogos_admin, notificaciones, transiciones
 from app.services.historial import fijar_contexto
 from app.services.presentacion import conteos_confirmaciones, detalle_de, longevidad_dias
 from app.services.sqlutil import error_validacion, fecha_local_sql, validar_rango_fechas
@@ -130,6 +130,10 @@ def listar_cola(
     return [ReporteModeracionItem(**_item(r, usuario.rol, conteos, por_autor)) for r in filas], total
 
 
+def _folio_principal(db: Session, r: Reporte) -> str | None:
+    return db.scalar(select(Reporte.folio).where(Reporte.id == r.reporte_principal_id)) if r.reporte_principal_id else None
+
+
 def _obtener(db: Session, folio: str, *, bloquear: bool = False) -> Reporte:
     stmt = select(Reporte).where(Reporte.folio == folio)
     if bloquear:
@@ -169,6 +173,7 @@ def detalle(db: Session, usuario: Usuario, folio: str) -> ReporteModeracion:
         descripcion=r.descripcion,
         detalle=detalle_de(r),
         motivo_rechazo=r.motivo_rechazo,
+        folio_principal=_folio_principal(db, r),
         fecha_programada=r.fecha_programada,
         fecha_reparacion=r.fecha_reparacion,
         historial=historial,
@@ -208,14 +213,20 @@ def transicionar(db: Session, usuario: Usuario, folio: str, datos: TransicionIn)
     elif nuevo != EstadoReporte.PROGRAMADO and datos.fecha_programada is not None:
         raise error_validacion("fecha_programada", "Sólo se indica al pasar a «Programado».")
 
+    motivo_texto = datos.motivo
     if nuevo == EstadoReporte.RECHAZADO:
-        reporte.motivo_rechazo = datos.motivo  # RN-07: motivo obligatorio (validado en el esquema)
+        # HU-06.3: sólo motivos activos del catálogo; el texto queda guardado tal cual (no cambia si luego se edita).
+        catalogo = catalogos_admin.motivo_autorizado(db, datos.motivo_id)
+        motivo_texto = f"{catalogo.nombre}: {datos.motivo}" if datos.motivo else catalogo.nombre
+        if len(motivo_texto.strip()) < 10:  # ck_rechazo_con_motivo exige al menos 10 caracteres
+            motivo_texto = f"Motivo: {motivo_texto}"
+        reporte.motivo_rechazo = motivo_texto  # RN-07: motivo obligatorio
 
     ahora = ahora_utc()
-    fijar_contexto(db, usuario_id=usuario.id, origen=OrigenCambio.MODERACION, motivo=datos.motivo, fecha_evento=ahora)
+    fijar_contexto(db, usuario_id=usuario.id, origen=OrigenCambio.MODERACION, motivo=motivo_texto, fecha_evento=ahora)
     reporte.estado = nuevo
     db.flush()
-    notificaciones.notificar_cambio_estado(db, reporte, nuevo, usuario, datos.motivo)  # HU-08.2
+    notificaciones.notificar_cambio_estado(db, reporte, nuevo, usuario, motivo_texto)  # HU-08.2
     resultado = TransicionOut(
         folio=reporte.folio,
         estado_anterior=anterior,

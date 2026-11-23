@@ -145,6 +145,8 @@ class ReporteResumenPublico(BaseModel):
     es_punto_recurrente: bool | None = None
     dias_distintos_anio: int | None = None
     ultima_ocurrencia: FechaLocal | None = None
+    # HU-01.4: sólo con sesión y colonias de interés; true si es de una de «Tus colonias».
+    en_tus_colonias: bool | None = None
 
 
 class ReportePublico(ReporteResumenPublico):
@@ -211,6 +213,8 @@ class MiReporte(BaseModel):
     colonia: ColoniaRef
     created_at: FechaLocal
     motivo_rechazo: str | None
+    # HU-05.3: si se fusionó como duplicado, folio del reporte al que hay que darle seguimiento.
+    folio_principal: str | None = None
     longevidad_dias: int | None
     es_mio: Literal[True] = True
 

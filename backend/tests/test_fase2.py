@@ -15,6 +15,7 @@ from app.services.historial import fijar_contexto
 from tests.conftest import (
     crear_reporte,
     desplazar,
+    motivo_id,
     payload_bache,
     payload_enc,
     primera_colonia,
@@ -184,7 +185,7 @@ def test_cada_cambio_de_estado_avisa_al_autor(client, ciudadano, moderador, coor
 
 def test_rechazo_avisa_con_motivo(client, ciudadano, moderador):
     folio = nuevo_bache(client, ciudadano)
-    transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo="Foto sin relación con el daño")
+    transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo_id=motivo_id(client), motivo="Foto sin relación con el daño")
     n = avisos(client, ciudadano)["datos"][0]
     assert "rechazado" in n["mensaje"] and "Foto sin relación con el daño" in n["mensaje"]
 
@@ -263,7 +264,7 @@ def test_ws_no_difunde_baches_y_si_confirmaciones_y_retiros(client, ciudadano, c
         assert r.status_code == 201
         actualizado = siguiente_evento(ws, "encharcamiento.actualizado", folio)
         assert actualizado["reporte"]["vigencia"]["sigue_ahi"] == 1
-        transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo="Reporte falso")
+        transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo_id=motivo_id(client), motivo="Reporte falso")
         retirado = siguiente_evento(ws, "encharcamiento.retirado", folio)
         assert retirado["reporte"] is None
 

@@ -9,6 +9,8 @@ from app.core.dependencies import MODERACION, get_db
 from app.models import EstadoReporte, Severidad, TipoDano, Usuario
 from app.schemas.comun import Pagina, ParametrosPagina, armar_pagina, respuestas
 from app.schemas.moderacion import ReporteModeracion, ReporteModeracionItem, TransicionIn, TransicionOut
+from app.schemas.operacion import FusionIn, FusionOut
+from app.services import fusion
 from app.services import moderacion as servicio
 from app.services import reportes as servicio_reportes
 from app.services import tiempo_real
@@ -86,3 +88,19 @@ def transicionar(
         db, servicio_reportes.obtener_por_folio(db, folio), "retirado" if resultado.estado.value == "Rechazado" else "actualizado"
     )  # HU-08.3
     return resultado
+
+
+@router.post(
+    "/reportes/fusionar",
+    response_model=FusionOut,
+    summary="Fusionar un reporte duplicado con su reporte principal (HU-05.3, transacción atómica)",
+    description=(
+        "El secundario (en «Recibido») pasa a «Rechazado» con motivo «Duplicado», conserva su folio y apunta al "
+        "principal. Las confirmaciones se suman al principal sin contar dos veces a la misma persona. Si algo falla, "
+        "no se aplica ningún cambio."
+    ),
+    responses=respuestas(401, 403, 404, 409, 422),
+)
+def fusionar(datos: FusionIn, usuario: Usuario = Depends(MODERACION), db: Session = Depends(get_db)) -> dict:
+    expirar_vencidos(db)
+    return fusion.fusionar(db, usuario, datos.folio_principal, datos.folio_secundario)

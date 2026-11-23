@@ -390,6 +390,20 @@ Límite: **3 fotos por persona y reporte** (se valida con candado de fila `SELEC
 
 Índice: `idx_notificaciones_usuario (usuario_id, leida, created_at DESC)`. Se crea una fila en la **misma transacción** que el cambio de estado hecho por moderación (si la transacción falla, no hay aviso). Quien hace el cambio no se notifica a sí mismo. Además, `reportes.idempotency_key UUID` (HU-08.4) con índice único parcial `uq_reportes_idempotencia (usuario_id, idempotency_key)`; nunca se expone en la API.
 
+### 4.10 Tablas de la Fase 3 (HU-05.3, HU-05.4, HU-05.5, HU-06.3, HU-01.4)
+
+| Tabla / columna | Definición | Reglas |
+|-----------------|------------|--------|
+| `reportes.reporte_principal_id` | `BIGINT NULL` FK → `reportes.id` | Sólo en el secundario de una fusión. `CHECK (reporte_principal_id <> id)`. |
+| `cuadrillas` | `id SERIAL`, `nombre`, `responsable`, `telefono_contacto`, `activa`, `created_at` | Nombre único sin distinguir mayúsculas (`uq_cuadrillas_nombre`). Teléfono `^[0-9 +()-]{7,20}$`. |
+| `asignaciones_cuadrilla` | `id`, `reporte_id`, `cuadrilla_id`, `fecha_programada`, `asignado_por_id`, `activa`, `created_at` | Historial: un reporte puede tener varias filas; **sólo una activa** (`uq_asignacion_activa` parcial). Reasignar desactiva la anterior. |
+| `usuario_cuadrillas` | PK compuesta (`usuario_id`, `cuadrilla_id`) | Sólo cuentas con rol `enlace_municipal` (validado en la API). |
+| `catalogo_tipos_dano` | `clave tipo_dano UNIQUE`, `nombre`, `descripcion`, `activo`, fechas | Gobierna disponibilidad y texto visible de los tres tipos soportados. |
+| `catalogo_motivos_rechazo` | `nombre` único sin mayúsculas, `descripcion`, `activo`, fechas | Nunca se borran: se desactivan. |
+| `usuario_colonias_favoritas` | PK compuesta (`usuario_id`, `colonia_id`) | Relación **N:M** usuario–colonia. Máx. 20 por persona. |
+
+`rol_usuario` incorpora el valor `enlace_municipal` (un valor de `ENUM` no se elimina en el *downgrade*).
+
 ---
 
 ## 5. Cómo el esquema garantiza las reglas de negocio
@@ -579,6 +593,12 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 | Leer avisos de otra persona | ❌ 401 | ❌ 404 | ❌ 404 | ❌ 404 |
 | Canal WebSocket de encharcamientos en vivo (datos públicos) | ✅ | ✅ | ✅ | ✅ |
 | Ver puntos recurrentes de inundación (`/indicadores/puntos-recurrentes`) | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Fusionar reportes duplicados (`/moderacion/reportes/fusionar`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
+| Rechazar con motivo **activo** del catálogo | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
+| Cuadrillas: crear, editar, desactivar, asignar y vincular enlaces | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Administrar catálogos de tipos de daño y motivos de rechazo | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Mis colonias de interés (`/perfil/colonias-favoritas`) | ❌ 401 | ✅ | ✅ | ✅ |
+| Revisar mi trayecto y resumen público por colonia | ✅ | ✅ | ✅ | ✅ |
 | Cola de moderación (incluye `Rechazado`, `autor_id`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | `Recibido → Validado` / `Recibido → Rechazado` | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
 | `Activo → Rechazado` (encharcamiento) | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
@@ -686,3 +706,61 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 * **Cola de envío** (`csj.cola.<usuario>`): un reporte creado sin conexión se guarda con `idempotency_key` (UUID). Al volver la red (evento `online`, al abrir la app y cada 30 s con pendientes) se envía en orden. El servidor **deduplica por `(usuario_id, idempotency_key)`**: reenviar devuelve el mismo folio (`200` en lugar de `201`) y no cuenta contra el límite de 10/hora. Estados visibles: `Sin conexión`, `Guardado para enviar`, `Enviando`, `No se pudo enviar`.
 * **Conflictos al reconectar**: `409 POSIBLE_DUPLICADO` → el borrador se conserva con los folios cercanos y las opciones «Enviar como daño distinto» o «Descartar»; `422` (territorio u otros) → se conserva con el motivo; `429` → se reintenta más tarde; `401` → se conserva hasta iniciar sesión. Un borrador **nunca se descarta solo**.
 * **Limitaciones documentadas**: las fotografías no se guardan sin conexión; la cola vive en el dispositivo de cada persona (se conserva tras cerrar sesión para no perder reportes y sólo se envía con la sesión de su dueño); `beforeinstallprompt` sólo existe en navegadores Chromium, por lo que el botón «Instalar app» aparece únicamente allí.
+
+---
+
+## 12. Requisitos opcionales · Fase 3 (HU-05.3, HU-05.4, HU-05.5, HU-06.3, HU-01.4, HU-04.6, HU-07.2)
+
+### 12.1 Quinto rol: `enlace_municipal` (HU-05.5)
+
+Cada cuenta sigue teniendo **un solo rol**. Matriz específica (`403` en todo lo no listado):
+
+| Acción | `enlace_municipal` |
+|--------|:------------------:|
+| `GET /enlace/reportes` y `GET /enlace/reportes/{folio}` de baches con **asignación activa** a una cuadrilla vinculada a su cuenta | ✅ |
+| `POST /enlace/reportes/{folio}/avance`: `Programado → En reparación` y `En reparación → Reparado` (fecha entre el reporte y hoy) | ✅ |
+| Baches o cuadrillas ajenas (exista o no el folio: misma respuesta) | ❌ 403 `REPORTE_AJENO` |
+| Cuenta suspendida (token válido de una cuenta desactivada) | ❌ 403 `CUENTA_SUSPENDIDA` |
+| Moderación, coordinación, catálogos, crear o confirmar reportes | ❌ 403 |
+
+El actor queda en `historial_estados` (usuario y fecha) con el motivo «Avance reportado por enlace municipal (cuadrilla …)», y el autor recibe su aviso (HU-08.2). La respuesta `CUENTA_SUSPENDIDA` aplica a todas las rutas protegidas: un token aún vigente de una cuenta desactivada recibe `403` en lugar de `401`.
+
+### 12.2 Fusión de duplicados (HU-05.3)
+
+* Alcance: **pavimento** del mismo tipo. Los encharcamientos no se fusionan (se confirman con «Sigue ahí» y vencen solos, RN-06).
+* El **secundario** debe estar en `Recibido` (la máquina de estados, también en el trigger de BD, sólo permite `Recibido → Rechazado`); el **principal** debe estar abierto. Mismo folio o principal rechazado/cerrado → `422`/`409`.
+* Transacción única con candado de fila ordenado por `id` (evita *deadlocks*); ante cualquier error, `rollback` total (probado inyectando una falla después de mover confirmaciones).
+* Confirmaciones: se suman al principal quienes confirmaron el secundario **y el autor del secundario**, excepto quien ya confirmó el principal y el autor del principal (el trigger le impide confirmar lo propio). Se insertan filas nuevas: las confirmaciones son *append-only*.
+* El secundario pasa a `Rechazado` con `motivo_rechazo = "Duplicado de <folio principal>"` (la BD exige ≥ 10 caracteres), conserva su folio y guarda `reporte_principal_id`. «Mis reportes» y el detalle de moderación muestran el enlace al principal.
+
+### 12.3 Cuadrillas (HU-05.4)
+
+* Asignar exige bache `Validado` (pasa a `Programado` con `fecha_programada >= hoy`) o reasignar uno `Programado`; cuadrilla activa. Queda en `historial_estados` el actor y el motivo «Asignado a la cuadrilla … para el …».
+* **Eliminar**: bloqueado (`409 CUADRILLA_CON_PENDIENTES`) si tiene baches `Programado`/`En reparación`; si tiene historial o enlaces, también `409` y se sugiere **desactivar** (trazabilidad). Sólo una cuadrilla sin uso se elimina.
+
+### 12.4 Catálogos administrables (HU-06.3)
+
+* **Motivos de rechazo**: CRUD sin borrado. Al rechazar, `motivo_id` (activo) es **obligatorio**; `motivo` es un detalle opcional. Se guarda el texto «Nombre: detalle» en el reporte y en el historial, por lo que editar o desactivar el motivo **no altera** rechazos anteriores.
+* **Tipos de daño**: el catálogo controla qué tipos se ofrecen y aceptan y su texto visible. Desactivar uno oculta la opción del formulario (`GET /catalogos/tipos-dano` sólo devuelve activos) y el servidor responde `422` a reportes nuevos de ese tipo; los existentes no cambian. **Limitación**: un tipo con comportamiento nuevo (otro formulario, severidad o vigencia) requiere código; por eso el alta sólo admite los tres tipos base que no estén ya registrados.
+
+### 12.5 Colonias de interés (HU-01.4)
+
+* Agregar sólo colonias activas (`422` si no); si después se desactivan, el registro se conserva y se muestra como «Colonia desactivada».
+* En `GET /reportes` con sesión, si la persona tiene colonias de interés y **no** filtra por `colonia_id` o `sector_id` (filtros excluyentes), el orden antepone sus colonias y cada elemento trae `en_tus_colonias`. El total y el resto de reportes no cambian. La interfaz agrupa «Tus colonias» y «Resto de la ciudad».
+
+### 12.6 Revisar mi trayecto (HU-04.6)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Proveedor | **OSRM** (`ROUTING_API_URL`, perfil `driving`, `overview=full`, GeoJSON). El demo público `router.project-osrm.org` no tiene SLA ni cuota garantizada: para producción se debe usar un servidor OSRM propio. Sólo lo consulta el backend. |
+| Respaldo | Si OSRM falla, tarda más de `ROUTING_TIMEOUT_SECONDS` o no está configurado, se usa el **segmento directo** origen–destino y la respuesta lo marca (`fuente: "linea_recta"`, `degradado: true`, mensaje). |
+| Territorio | Origen y destino validados con RN-01 (`422 FUERA_DE_JUAREZ`). |
+| Distancia | Punto–polilínea por segmento con proyección equirectangular local (misma esfera que Haversine). Incluidos los encharcamientos `Activo` vigentes a **<= 100 m** (inclusivo). |
+| Orden | Primero `intransitable`, luego por distancia. Sin datos de la persona reportante. Vacío: «No hay encharcamientos reportados cerca del trayecto». |
+
+### 12.7 Resumen público por colonia (HU-07.2)
+
+* **Abiertos**: baches y alcantarillas en `Recibido` (público como «Sin validar», RN-09), `Validado`, `Programado` y `En reparación`. `Rechazado` nunca cuenta.
+* **Reparados**: total histórico con estado `Reparado`.
+* **Tiempo promedio de reparación**: promedio de días entre la fecha **local** del reporte y `fecha_reparacion` (RN-10), de todos los reparados de la colonia (histórico completo); `null` si aún no hay reparados.
+* También informa los encharcamientos vigentes. Una colonia sin reportes devuelve ceros; una inexistente, `404`.

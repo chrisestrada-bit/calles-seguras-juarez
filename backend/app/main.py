@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.errores import registrar_manejadores
-from app.routers import admin, auth, catalogos, clima, geocoding, indicadores, moderacion, notificaciones, reportes, ws
+from app.routers import admin, auth, catalogos, clima, geocoding, indicadores, moderacion, notificaciones, operacion, reportes, ws
 from app.services.tiempo_real import gestor
 from app.services.vigencia import expirar_vencidos
 
@@ -81,6 +81,9 @@ async def encabezados_de_seguridad(request: Request, call_next):
 PREFIJO = "/api/v1"
 for modulo in (auth, reportes, moderacion, catalogos, admin, indicadores, clima, geocoding, notificaciones, ws):
     app.include_router(modulo.router, prefix=PREFIJO)
+# Fase 3: cuadrillas, enlace municipal, perfil, trayecto y resumen público por colonia.
+for sub in (operacion.cuadrillas, operacion.enlace, operacion.perfil, operacion.ruta_trayecto, operacion.publico):
+    app.include_router(sub, prefix=PREFIJO)
 
 
 @app.get("/salud", tags=["salud"], summary="Verificación de disponibilidad")

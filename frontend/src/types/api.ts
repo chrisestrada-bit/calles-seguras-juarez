@@ -1,4 +1,4 @@
-export type Rol = 'visitante' | 'ciudadano' | 'moderador' | 'coordinador';
+export type Rol = 'visitante' | 'ciudadano' | 'moderador' | 'coordinador' | 'enlace_municipal';
 export type TipoDano = 'Bache' | 'Alcantarilla sin tapa' | 'Encharcamiento';
 export type Severidad = 'Baja' | 'Media' | 'Alta';
 export type EstadoPavimento = 'Recibido' | 'Validado' | 'Programado' | 'En reparación' | 'Reparado' | 'Rechazado';
@@ -34,6 +34,8 @@ export interface ReporteResumenPublico {
   longevidad_dias: number | null; vigencia: Vigencia | null; nivel_agua?: string | null;
   /** HU-03.4: sólo en encharcamientos. */
   es_punto_recurrente?: boolean | null; dias_distintos_anio?: number | null; ultima_ocurrencia?: string | null;
+  /** HU-01.4: true si es de una de «Tus colonias» (sólo con sesión). */
+  en_tus_colonias?: boolean | null;
 }
 export interface HistorialPublico { estado_anterior: EstadoReporte | null; estado_nuevo: EstadoReporte; origen: OrigenHistorial; fecha: string; }
 export interface Paginacion { pagina: number; por_pagina: number; total: number; total_paginas: number; }
@@ -58,19 +60,19 @@ export interface EditarReporteRequest { colonia_id?: number; calle?: string; ref
 export interface ReporteAutenticado extends ReportePublico { es_mio: boolean; ya_confirmado_por_mi?: boolean; }
 export interface CandidatoCercano { folio: string; tipo_dano: TipoDano; estado: EstadoReporte; etiqueta_publica: string | null; severidad: Severidad; calle: string; distancia_metros: number; confirmaciones: number; ya_confirmado_por_mi: boolean; es_mio: boolean; created_at: string; }
 export interface CercanosResponse { radio_metros: number; candidatos: CandidatoCercano[]; }
-export interface ReporteMio extends Pick<ReporteResumenPublico, 'folio' | 'tipo_dano' | 'estado' | 'etiqueta_publica' | 'severidad' | 'calle' | 'colonia' | 'created_at' | 'longevidad_dias'> { motivo_rechazo?: string | null; es_mio: true; }
+export interface ReporteMio extends Pick<ReporteResumenPublico, 'folio' | 'tipo_dano' | 'estado' | 'etiqueta_publica' | 'severidad' | 'calle' | 'colonia' | 'created_at' | 'longevidad_dias'> { motivo_rechazo?: string | null; folio_principal?: string | null; es_mio: true; }
 export interface HistorialResponse { folio: string; historial: HistorialPublico[]; }
 export interface ConfirmacionRequest { tipo: TipoConfirmacion; }
 export interface ConfirmacionResponse { folio: string; tipo: TipoConfirmacion; estado_reporte: EstadoReporte; vigencia: Vigencia; mensaje: string; }
 
 export interface ModeracionHistorial extends HistorialPublico { actor_id: string; actor_rol: Rol; motivo: string | null; }
 export interface ReporteModeracionResumen { folio: string; tipo_dano: TipoDano; estado: EstadoReporte; severidad: Severidad; calle: string; colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo; confirmaciones: number; forzado_como_nuevo: boolean; autor_id: string; reportes_autor_ultimas_24h: number; created_at: string; transiciones_disponibles: EstadoReporte[]; }
-export interface ReporteModeracionDetalle extends Omit<ReportePublico, 'etiqueta_publica' | 'fecha_programada' | 'fecha_reparacion' | 'longevidad_dias' | 'vigencia'> { forzado_como_nuevo: boolean; motivo_rechazo: string | null; autor_id: string; reportes_autor_ultimas_24h: number; historial: ModeracionHistorial[]; transiciones_disponibles: EstadoReporte[]; }
-export interface TransicionRequest { estado_nuevo: EstadoReporte; fecha_reparacion?: string | null; motivo?: string | null; fecha_programada?: string | null; }
+export interface ReporteModeracionDetalle extends Omit<ReportePublico, 'etiqueta_publica' | 'fecha_programada' | 'fecha_reparacion' | 'longevidad_dias' | 'vigencia'> { forzado_como_nuevo: boolean; motivo_rechazo: string | null; folio_principal?: string | null; autor_id: string; reportes_autor_ultimas_24h: number; historial: ModeracionHistorial[]; transiciones_disponibles: EstadoReporte[]; }
+export interface TransicionRequest { estado_nuevo: EstadoReporte; fecha_reparacion?: string | null; motivo_id?: number | null; motivo?: string | null; fecha_programada?: string | null; }
 export interface TransicionResponse { folio: string; estado_anterior: EstadoReporte; estado: EstadoReporte; fecha_reparacion: string | null; longevidad_dias: number | null; registrado_en: string; mensaje: string; }
 
 export interface CampoFormulario { nombre: string; etiqueta: string; tipo: 'enum' | 'booleano'; obligatorio: boolean; opciones?: string[]; visible_si?: Record<string, string>; }
-export interface TipoDanoCatalogo { tipo_dano: TipoDano; prefijo_folio: 'BCH' | 'ENC'; radio_duplicados_metros: number; severidad_fija?: Severidad; vigencia_horas?: number; desmentidos_para_historico?: number; campos: CampoFormulario[]; }
+export interface TipoDanoCatalogo { tipo_dano: TipoDano; nombre?: string | null; descripcion?: string | null; prefijo_folio: 'BCH' | 'ENC'; radio_duplicados_metros: number; severidad_fija?: Severidad; vigencia_horas?: number; desmentidos_para_historico?: number; campos: CampoFormulario[]; }
 export interface TiposDanoResponse { limites_territorio: { latitud_min: number; latitud_max: number; longitud_min: number; longitud_max: number }; descripcion_max_caracteres: number; datos: TipoDanoCatalogo[]; }
 export interface TransicionCatalogo { desde: EstadoReporte; hacia: EstadoReporte; roles: Array<Rol | 'sistema'>; }
 export interface EstadosResponse { pavimento: { estados: EstadoPavimento[]; finales: EstadoPavimento[]; transiciones: TransicionCatalogo[]; etiquetas_publicas: Record<string, string>; }; encharcamiento: { estados: EstadoEncharcamiento[]; finales: EstadoEncharcamiento[]; transiciones: TransicionCatalogo[]; }; }
@@ -127,3 +129,28 @@ export type EventoEnVivo =
   | { tipo: 'hola'; heartbeat_segundos?: number; event_id?: undefined; folio?: undefined; reporte?: undefined }
   | { tipo: 'ping' | 'pong'; event_id?: undefined; folio?: undefined; reporte?: undefined; heartbeat_segundos?: undefined }
   | { tipo: 'encharcamiento.creado' | 'encharcamiento.actualizado' | 'encharcamiento.retirado'; event_id: string; folio: string; emitido_en: string; reporte: ReporteResumenPublico | null; heartbeat_segundos?: undefined };
+
+/** HU-05.3 */
+export interface FusionResponse { folio_principal: string; folio_secundario: string; estado_secundario: EstadoReporte; confirmaciones_transferidas: number; confirmaciones_principal: number; registrado_en: string; mensaje: string; }
+
+/** HU-05.4 / HU-05.5 */
+export interface Cuadrilla { id: number; nombre: string; responsable: string; telefono_contacto: string; activa: boolean; pendientes: number; created_at: string; }
+export interface BacheAsignado { asignacion_id: number; folio: string; tipo_dano: TipoDano; estado: EstadoReporte; calle: string; referencia: string | null; colonia: ReferenciaCatalogo; ubicacion: Ubicacion; fecha_programada: string; fecha_reparacion: string | null; cuadrilla: string; asignacion_activa: boolean; asignado_en: string; transiciones_disponibles: EstadoReporte[]; }
+export interface CuadrillaDetalle extends Cuadrilla { enlaces: Array<{ id: string; nombre: string; activo: boolean }>; baches: BacheAsignado[]; }
+export interface MisAsignaciones { cuadrillas: Array<{ id: number; nombre: string; activa: boolean }>; datos: BacheAsignado[]; }
+export interface AvanceResponse { folio: string; estado_anterior: EstadoReporte; estado: EstadoReporte; fecha_reparacion: string | null; mensaje: string; }
+
+/** HU-06.3 */
+export interface MotivoRechazo { id: number; nombre: string; descripcion: string | null; activo: boolean; }
+export interface TipoDanoAdmin { id: number; clave: TipoDano; nombre: string; descripcion: string | null; activo: boolean; }
+
+/** HU-01.4 */
+export interface ColoniaFavorita { colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo; codigo_postal: string | null; activa: boolean; agregada_en: string; }
+export interface ListaFavoritas { maximo: number; datos: ColoniaFavorita[]; }
+
+/** HU-04.6 */
+export interface EncharcamientoEnTrayecto { folio: string; calle: string; colonia: ReferenciaCatalogo; ubicacion: Ubicacion; nivel_agua: NivelAgua; es_intransitable: boolean; hay_riesgo_personas_vehiculos: boolean | null; distancia_metros: number; vigente_hasta: string; }
+export interface TrayectoResponse { origen: Ubicacion; destino: Ubicacion; radio_metros: number; ruta: { fuente: 'osrm' | 'linea_recta'; degradado: boolean; mensaje: string | null; distancia_metros: number; duracion_segundos: number | null; puntos: Array<[number, number]> }; total: number; datos: EncharcamientoEnTrayecto[]; mensaje: string | null; }
+
+/** HU-07.2 */
+export interface ResumenColonia { colonia: ReferenciaCatalogo; sector: ReferenciaCatalogo; codigo_postal: string | null; activa: boolean; abiertos: number; abiertos_por_estado: Record<string, number>; reparados: number; tiempo_promedio_reparacion_dias: number | null; encharcamientos_activos: number; criterios: { abiertos: string; tiempo_promedio_reparacion: string }; actualizado_en: string; }

@@ -39,6 +39,8 @@ class CampoFormulario(BaseModel):
 
 class TipoDanoCatalogo(BaseModel):
     tipo_dano: str
+    nombre: str | None = None  # HU-06.3: texto visible administrado por coordinación
+    descripcion: str | None = None
     prefijo_folio: str
     radio_duplicados_metros: int
     severidad_fija: str | None = None
