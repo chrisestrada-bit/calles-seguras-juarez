@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.errores import registrar_manejadores
+from app.core.limite_cuerpo import LimiteCuerpo
 from app.routers import admin, auth, catalogos, clima, geocoding, indicadores, moderacion, notificaciones, operacion, reportes, ws
 from app.services.tiempo_real import gestor
 from app.services.vigencia import expirar_vencidos
@@ -50,7 +51,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="Calles Seguras Juárez — API",
     description="Reportes ciudadanos de baches y encharcamientos en Ciudad Juárez, Chihuahua.",
-    version="1.0.0",
+    version="1.1.1",
     lifespan=lifespan,
     docs_url=None if settings.es_produccion else "/docs",
     redoc_url=None,
@@ -58,6 +59,10 @@ app = FastAPI(
 )
 
 registrar_manejadores(app)
+
+# M7: tope del cuerpo. Se registra ANTES que CORS para quedar por dentro: así el 413 también lleva las
+# cabeceras CORS y el navegador puede mostrar el mensaje en español.
+app.add_middleware(LimiteCuerpo, maximo_bytes=settings.max_cuerpo_bytes)
 
 # CORS restringido estrictamente al origen del frontend (FRONTEND_URL).
 app.add_middleware(
@@ -75,6 +80,13 @@ async def encabezados_de_seguridad(request: Request, call_next):
     respuesta = await call_next(request)
     respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
     respuesta.headers.setdefault("Cache-Control", "no-store")
+    # M5: la API sólo entrega JSON e imágenes; nunca debe incrustarse ni ejecutar contenido activo.
+    respuesta.headers.setdefault("X-Frame-Options", "DENY")
+    respuesta.headers.setdefault("Referrer-Policy", "no-referrer")
+    if respuesta.headers.get("content-type", "").startswith("application/json"):
+        respuesta.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+    if settings.es_produccion:
+        respuesta.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
     return respuesta
 
 

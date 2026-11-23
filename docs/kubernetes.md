@@ -75,7 +75,7 @@ kubectl apply -f infra/k8s/namespace.yaml
 kubectl -n calles-seguras create secret generic calles-seguras-secretos \
   --from-literal=POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" \
   --from-literal=JWT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" \
-  --from-literal=SEED_PASSWORD='Juarez2026' \
+  --from-literal=SEED_PASSWORD="$(python -c "import secrets; print(secrets.token_urlsafe(18) + 'a1')")" \
   --from-literal=GEOCODING_API_KEY=''
 
 kubectl apply -f infra/k8s/

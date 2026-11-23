@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errores import ErrorAPI
 from app.models import ConfirmacionReporte, EstadoReporte, ReporteFoto, Reporte, RolUsuario, Usuario
+from app.services.imagenes import ImagenInvalida, limpiar_metadatos
 
 logger = logging.getLogger("calles_seguras")
 
@@ -61,6 +62,11 @@ def validar_archivo(nombre: str | None, flujo: BinaryIO) -> tuple[bytes, str] | 
     mime = tipo_por_contenido(contenido)
     if mime is None:
         return FotoRechazada(etiqueta, "Formato no permitido: sólo se aceptan imágenes JPG o PNG.")
+    try:
+        # RN-04: se guardan sin EXIF/GPS/XMP ni datos ocultos tras el fin de imagen (auditoría final, A3).
+        contenido = limpiar_metadatos(contenido, mime)
+    except ImagenInvalida:
+        return FotoRechazada(etiqueta, "La imagen está dañada o no es un JPG/PNG válido.")
     return contenido, mime
 
 
@@ -141,6 +147,18 @@ def agregar_fotos(
     for foto in guardadas:
         db.refresh(foto)
     return guardadas, rechazadas
+
+
+def puede_ver_nombre_original(reporte: Reporte, foto: ReporteFoto, usuario: Usuario | None) -> bool:
+    """El nombre del archivo puede contener datos personales: sólo lo ven quien la subió, el autor y moderación."""
+    return usuario is not None and (
+        usuario.id in (foto.usuario_id, reporte.usuario_id)
+        or usuario.rol in (RolUsuario.MODERADOR, RolUsuario.COORDINADOR)
+    )
+
+
+def nombre_publico(foto: ReporteFoto, posicion: int) -> str:
+    return f"fotografia-{posicion}{_EXTENSION.get(foto.mime_type, '')}"
 
 
 def autorizado_a_ver(reporte: Reporte, usuario: Usuario | None) -> bool:

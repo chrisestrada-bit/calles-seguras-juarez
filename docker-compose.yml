@@ -56,7 +56,9 @@ services:
       ROUTING_TIMEOUT_SECONDS: ${ROUTING_TIMEOUT_SECONDS:-6}
       # HU-02.4: fotografías de reportes en un volumen persistente (sobreviven a recrear el contenedor).
       UPLOADS_DIR: /srv/uploads
-      SEED_PASSWORD: ${SEED_PASSWORD:-Juarez2026}
+      # Sin valor por omisión (A1): defínela en .env. Si falta, las cuentas de prueba reciben una contraseña
+      # aleatoria no revelada (el catálogo y los reportes se siembran igual).
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
       RUN_SEED: ${RUN_SEED:-true}
     # 1) migraciones  2) datos semilla (idempotentes)  3) API
     command:

@@ -5,11 +5,13 @@ import { defineConfig, devices } from '@playwright/test'
  * y el frontend de Vite, y recorren la aplicación como lo haría una persona.
  *
  * Variables (todas opcionales):
- *  - E2E_API_PORT / E2E_WEB_PORT: puertos de la API (8000) y del frontend (4173).
+ *  - E2E_API_PORT / E2E_WEB_PORT: puertos de la API (18000) y del frontend (4173). La API NO usa el 8000 por
+ *    omisión: ahí suele correr el backend de `docker compose`, y reutilizarlo escribía datos de prueba en la base
+ *    de desarrollo (auditoría final, M9).
  *  - DATABASE_URL, JWT_SECRET_KEY, SEED_PASSWORD: los mismos que usa el backend (ver .env.example).
  *  - E2E_SKIP_WEBSERVER=1: no arranca servidores (ya están corriendo).
  */
-const apiPort = process.env.E2E_API_PORT ?? '8000'
+const apiPort = process.env.E2E_API_PORT ?? '18000'
 const webPort = process.env.E2E_WEB_PORT ?? '4173'
 const apiUrl = `http://localhost:${apiPort}`
 const webUrl = `http://localhost:${webPort}`
@@ -49,7 +51,11 @@ export default defineConfig({
           url: `${apiUrl}/salud`,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
-          env: { FRONTEND_URL: webUrl, ROUTING_API_URL: '', GEOCODING_API_KEY: '', UPLOADS_DIR: process.env.UPLOADS_DIR ?? './.uploads_e2e' },
+          env: {
+            FRONTEND_URL: webUrl, ROUTING_API_URL: '', GEOCODING_API_KEY: '', UPLOADS_DIR: process.env.UPLOADS_DIR ?? './.uploads_e2e',
+            // Todas las pruebas llegan desde 127.0.0.1: se elevan los límites anti-abuso por IP (registro y login).
+            LIMITE_REGISTROS_POR_HORA_IP: '100000', LIMITE_LOGIN_FALLIDOS_POR_IP: '100000',
+          },
         },
         {
           command: `npm run dev -- --host 127.0.0.1 --port ${webPort} --strictPort`,

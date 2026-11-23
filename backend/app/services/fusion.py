@@ -25,7 +25,7 @@ from app.models import (
     TipoDano,
     Usuario,
 )
-from app.services import notificaciones
+from app.services import notificaciones, transiciones
 from app.services.historial import fijar_contexto
 
 MOTIVO_DUPLICADO = "Duplicado"
@@ -60,6 +60,9 @@ def fusionar(db: Session, actor: Usuario, folio_principal: str, folio_secundario
                 409, "SECUNDARIO_NO_FUSIONABLE",
                 f"Sólo se fusionan reportes «Recibido» (sin validar); {secundario.folio} está «{secundario.estado.value}».",
             )
+        # RN-05: fusionar rechaza al secundario (Recibido -> Rechazado), que sólo puede hacer moderación.
+        # Sin esta verificación, coordinación rechazaba reportes por esta vía (auditoría final, M3).
+        transiciones.validar_transicion(secundario.tipo_dano, secundario.estado, EstadoReporte.RECHAZADO, actor.rol)
 
         ya_en_principal = set(
             db.scalars(select(ConfirmacionReporte.usuario_id).where(ConfirmacionReporte.reporte_id == principal.id))

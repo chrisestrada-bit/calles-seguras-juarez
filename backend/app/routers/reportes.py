@@ -335,11 +335,11 @@ def editar(
     return presentacion.a_publico(reporte, conteos, usuario, confirmados)
 
 
-def _foto_out(folio: str, f) -> FotoOut:
+def _foto_out(folio: str, f, nombre: str | None = None) -> FotoOut:
     return FotoOut(
         id=f.id,
         url=f"/api/v1/reportes/{folio}/fotos/{f.id}",
-        nombre_original=f.nombre_original,
+        nombre_original=nombre or f.nombre_original,
         mime_type=f.mime_type,
         tamano_bytes=f.tamano_bytes,
         created_at=f.created_at,
@@ -400,7 +400,11 @@ def listar_fotos(
     return ListaFotos(
         folio=folio,
         maximo_por_persona=fotos.MAX_FOTOS_POR_PERSONA,
-        datos=[_foto_out(folio, f) for f in fotos.listar(db, reporte)],
+        # RN-04: el nombre original del archivo sólo lo ven quien subió la foto, el autor y moderación.
+        datos=[
+            _foto_out(folio, f, None if fotos.puede_ver_nombre_original(reporte, f, usuario) else fotos.nombre_publico(f, i))
+            for i, f in enumerate(fotos.listar(db, reporte), start=1)
+        ],
     )
 
 

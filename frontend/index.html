@@ -12,19 +12,8 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Calles Seguras" />
-    <script>
-      /* Aplica el tema antes del primer pintado para evitar parpadeo (FOUC). */
-      (function () {
-        var tema = 'light';
-        try {
-          var guardado = localStorage.getItem('csj-theme');
-          tema = guardado === 'dark' || guardado === 'light' ? guardado : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        } catch (e) {}
-        document.documentElement.setAttribute('data-theme', tema);
-        var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', tema === 'dark' ? '#0b1120' : '#f3f5f9');
-      })();
-    </script>
+    <!-- Tema antes del primer pintado (archivo propio: la CSP no permite scripts inline). -->
+    <script src="/tema-inicial.js"></script>
   </head>
   <body>
     <div id="root"></div>

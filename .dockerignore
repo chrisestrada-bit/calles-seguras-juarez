@@ -9,3 +9,6 @@ graphify-out
 .impeccable
 **/__pycache__
 **/.pytest_cache
+uploads/
+.uploads_test/
+.uploads_e2e/

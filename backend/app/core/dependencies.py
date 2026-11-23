@@ -95,3 +95,6 @@ CUALQUIER_ROL = requiere_rol(RolUsuario.CIUDADANO, RolUsuario.MODERADOR, RolUsua
 MODERACION = requiere_rol(RolUsuario.MODERADOR, RolUsuario.COORDINADOR)
 SOLO_COORDINADOR = requiere_rol(RolUsuario.COORDINADOR)
 SOLO_ENLACE = requiere_rol(RolUsuario.ENLACE_MUNICIPAL)  # HU-05.5
+# Gestión de la propia sesión (/auth/yo, /renovar, /cerrar-sesion): cualquier cuenta autenticada, incluido el
+# enlace municipal; sin esto su token no se podía revocar ni renovar (auditoría final, A2).
+CUALQUIER_SESION = requiere_rol(*RolUsuario)

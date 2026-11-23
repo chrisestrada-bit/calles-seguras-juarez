@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
 from app.core.errores import ErrorAPI
+from app.core.red import ip_cliente
 from app.schemas.comun import Latitud, Longitud, respuestas
 from app.schemas.geocoding import RespuestaGeocodificacion, RespuestaGeocodificacionInversa
 from app.services import geocoding as servicio
@@ -13,12 +14,12 @@ from app.services.sqlutil import error_validacion
 
 router = APIRouter(prefix="/geocoding", tags=["geocoding"])
 
-# Protege la cuota de LocationIQ: 30 búsquedas por minuto por IP (por proceso).
+# Protege la cuota de LocationIQ: 30 búsquedas por minuto por IP real del cliente (por proceso, ver app/core/red.py).
 _limitador = LimitadorVentana(maximo=30, ventana_segundos=60)
 
 
 def _limitar(request: Request) -> None:
-    espera = _limitador.intentar(request.client.host if request.client else "desconocida")
+    espera = _limitador.intentar(ip_cliente(request))
     if espera is not None:
         raise ErrorAPI(
             429,

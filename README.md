@@ -23,7 +23,7 @@ docker compose up --build
 
 ### Cuentas de prueba
 
-La contraseña de todas es `SEED_PASSWORD` (por omisión `Juarez2026` en `docker-compose.yml`; cámbiala en `.env`).
+La contraseña de todas es el valor que pongas en `SEED_PASSWORD` dentro de tu `.env` (no hay valor por omisión: si la dejas vacía, las cuentas reciben una contraseña aleatoria y no podrás entrar con ellas). Defínela **antes** del primer `docker compose up`; si ya sembraste, la semilla no cambia contraseñas de cuentas existentes.
 
 | Correo | Rol | Qué probar |
 |--------|-----|------------|
