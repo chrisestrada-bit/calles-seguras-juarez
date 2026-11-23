@@ -661,7 +661,7 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 
 ### 10.4 Almacenamiento de fotografías (HU-02.4)
 
-`UPLOADS_DIR` (por defecto `uploads/`; en Docker `/srv/uploads`, montado como volumen nombrado `uploads` para sobrevivir al reinicio del contenedor). El tipo se determina por encabezado binario (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`), sin confiar en extensión ni `Content-Type`. El tope de 5 MB es exacto (5 MB se acepta, 5 MB + 1 byte se rechaza). Una foto inválida se rechaza con su motivo sin afectar al reporte ni a las demás fotos (`201` con `aceptadas`/`rechazadas`; `422` si ninguna es válida).
+`UPLOADS_DIR` (por defecto `uploads/`; en Docker `/srv/uploads`, montado como volumen nombrado `uploads` para sobrevivir al reinicio del contenedor). El tipo se determina por encabezado binario (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`), sin confiar en extensión ni `Content-Type`. El tope de 5 MB es exacto (5 MB se acepta, 5 MB + 1 byte se rechaza). Se rechazan también dimensiones anómalas (más de 16 384 px por lado o 60 MP en total, leídas de IHDR/SOF) para evitar bombas de descompresión en el navegador de quien abre la foto. Una foto inválida se rechaza con su motivo sin afectar al reporte ni a las demás fotos (`201` con `aceptadas`/`rechazadas`; `422` si ninguna es válida).
 
 ---
 
