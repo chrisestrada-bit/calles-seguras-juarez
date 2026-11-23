@@ -13,7 +13,9 @@ recomprimirla, por lo que no se pierde calidad ni se agrega una dependencia):
 * En ambos formatos se descarta cualquier byte después del fin de imagen (EOI / IEND), donde suelen ocultarse
   archivos «políglotas».
 
-Un archivo con estructura inválida se rechaza (ValueError).
+Un archivo con estructura inválida se rechaza (ValueError). También se rechazan dimensiones anómalas (más de
+`MAX_LADO_PX` por lado o `MAX_PIXELES` en total): el servidor no decodifica la imagen, pero el navegador de quien la
+abre sí, y un PNG/JPEG diminuto que declara 65 535 × 65 535 píxeles es una «bomba de descompresión».
 """
 
 import struct
@@ -28,8 +30,18 @@ _SIN_LONGITUD = {0x01, *range(0xD0, 0xD8)}  # TEM y RST0–RST7 no llevan longit
 _APP0, _APP1, _APP2, _APP14, _COM = 0xE0, 0xE1, 0xE2, 0xEE, 0xFE
 
 
+MAX_LADO_PX = 16_384
+MAX_PIXELES = 60_000_000  # cubre cámaras de 50 MP (8160 × 6120)
+_SOF = {*range(0xC0, 0xD0)} - {0xC4, 0xC8, 0xCC}  # SOF0–SOF15 (excepto DHT, JPG y DAC)
+
+
 class ImagenInvalida(ValueError):
     pass
+
+
+def _validar_dimensiones(ancho: int, alto: int) -> None:
+    if ancho < 1 or alto < 1 or ancho > MAX_LADO_PX or alto > MAX_LADO_PX or ancho * alto > MAX_PIXELES:
+        raise ImagenInvalida("Dimensiones de imagen anómalas")
 
 
 # ----------------------------------------------------------------------------------------------------- JPEG
@@ -96,6 +108,12 @@ def _limpiar_jpeg(contenido: bytes) -> bytes:
         segmento = bytes([0xFF, marcador]) + contenido[i : i + longitud]
         i += longitud
 
+        if marcador in _SOF:
+            if len(datos) < 5:
+                raise ImagenInvalida("Segmento SOF inválido")
+            alto, ancho = struct.unpack_from(">HH", datos, 1)
+            # alto 0 en SOF es legal (se define con DNL), pero ningún navegador ni cámara lo usa: se rechaza.
+            _validar_dimensiones(ancho, alto)
         if marcador == _APP1:
             orientacion = orientacion or _orientacion_exif(datos)
             continue
@@ -144,6 +162,10 @@ def _limpiar_png(contenido: bytes) -> bytes:
         # El CRC no se valida: es integridad, no privacidad; el decodificador del navegador decide.
         if primero and tipo != b"IHDR":
             raise ImagenInvalida("PNG sin IHDR")
+        if primero:
+            if longitud != 13:
+                raise ImagenInvalida("IHDR inválido")
+            _validar_dimensiones(*struct.unpack_from(">II", contenido, i + 8))
         primero = False
         if tipo in _PNG_PERMITIDOS:
             salida += contenido[i:fin]
