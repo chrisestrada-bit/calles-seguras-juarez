@@ -9,11 +9,11 @@
  *  - /auth, /notificaciones, /reportes/mios, /moderacion, /admin, /indicadores privados, ni métodos distintos de GET.
  *  - Al cerrar sesión la app envía «limpiar-caches» y se vacía la caché pública.
  */
-const VERSION = 'v1';
+const VERSION = 'v2'; // v2: tema-inicial.js en el shell (CSP sin scripts inline)
 const CACHE_SHELL = `csj-shell-${VERSION}`;
 const CACHE_PUBLICO = `csj-publico-${VERSION}`;
 const MAX_ENTRADAS_PUBLICAS = 30;
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
+const SHELL = ['/', '/index.html', '/tema-inicial.js', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 // Rutas de API públicas cacheables: lista, mapa y detalle por folio (nunca /mios ni /exportar).
 const API_PUBLICA = /\/api\/v1\/reportes(\/mapa|\/(BCH|ENC)-\d{4}-\d{6})?$/;
@@ -74,7 +74,7 @@ self.addEventListener('fetch', (evento) => {
     evento.respondWith(redPrimero(peticion, CACHE_SHELL, () => caches.match('/index.html')));
     return;
   }
-  if (url.origin === self.location.origin && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/fonts/') || url.pathname.startsWith('/icons/'))) {
+  if (url.origin === self.location.origin && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/fonts/') || url.pathname.startsWith('/icons/') || url.pathname === '/tema-inicial.js')) {
     evento.respondWith(cachePrimero(peticion));
     return;
   }

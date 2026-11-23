@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _VALOR_EJEMPLO_JWT = "valor-ficticio"
@@ -37,6 +37,25 @@ class Settings(BaseSettings):
     # HU-04.6: servicio de rutas (OSRM). Vacío = siempre línea recta entre origen y destino.
     routing_api_url: str = "https://router.project-osrm.org"
     routing_timeout_seconds: float = 6
+
+    # IP real del cliente detrás de proxies (auditoría final, A4). Por omisión se usa la IP de la conexión TCP,
+    # correcta en docker compose. Sólo se confía en una cabecera si el despliegue la fija explícitamente:
+    #   CLIENT_IP_HEADER=CF-Connecting-IP  -> la cabecera que escribe el proxy de confianza (Cloudflare, etc.).
+    #   TRUSTED_PROXY_HOPS=1               -> toma la entrada de X-Forwarded-For agregada por el proxy más cercano.
+    client_ip_header: str = ""
+    trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
+
+    # Límites anti-abuso por IP (en memoria, por proceso). Las pruebas los elevan por variable de entorno.
+    limite_registros_por_hora_ip: int = Field(default=10, ge=1)
+    limite_login_fallidos_por_ip: int = Field(default=30, ge=1)  # por ventana de 15 min
+    limite_login_fallidos_por_cuenta_ip: int = Field(default=5, ge=1)  # por ventana de 15 min
+
+    # HU-08.3: tope de conexiones WebSocket (en memoria, por proceso) contra el agotamiento de recursos (M6).
+    ws_max_conexiones: int = Field(default=1000, ge=1)
+    ws_max_conexiones_por_ip: int = Field(default=20, ge=1)
+
+    # Tamaño máximo del cuerpo de una petición con archivos (3 fotos de 5 MB + margen multipart), M7.
+    max_cuerpo_bytes: int = Field(default=16 * 1024 * 1024, ge=1024 * 1024)
 
     # HU-02.4: directorio persistente de fotos (en Docker, un volumen montado). Nunca se sirve como estático.
     uploads_dir: str = "uploads"

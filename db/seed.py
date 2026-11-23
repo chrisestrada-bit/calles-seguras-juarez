@@ -10,7 +10,9 @@ volumen realista de reportes históricos y activos distribuidos en distintos est
 * Pasa por los mismos triggers que la aplicación: el historial de estados y los folios (RN-03) los
   genera la base de datos, y las transiciones respetan RN-05 y RN-06.
 * La contraseña de las cuentas de prueba sale de SEED_PASSWORD (ver .env.example); no hay valor por
-  omisión en el código. Sin SEED_PASSWORD las cuentas nuevas reciben una contraseña aleatoria no revelada.
+  omisión en el código ni en docker-compose.yml. Sin SEED_PASSWORD las cuentas nuevas reciben una contraseña
+  aleatoria no revelada. Con APP_ENV=production se exigen al menos 12 caracteres y se rechazan los valores de
+  ejemplo que alguna vez se publicaron en el repositorio (auditoría final, A1).
 * Colonias y fraccionamientos reales de Ciudad Juárez agrupados por sector. Los códigos postales
   (32000–32730) provienen del catálogo de SEPOMEX (consultado en micodigopostal.org, 2026-11-22); las
   coordenadas del centro son aproximadas. Samalayuca (32730) y San Isidro Río Grande (32720) quedan fuera
@@ -253,6 +255,10 @@ PESO_MES_LLUVIA = [1, 1, 1, 1, 2, 3, 10, 14, 10, 4, 2]  # temporada de lluvias: 
 # --------------------------------------------------------------------------- catálogos y usuarios
 
 
+# Valores que aparecieron en el repositorio o en su documentación: cualquiera puede conocerlos.
+CONTRASENAS_PUBLICADAS = {"juarez2026", "cambiaresto2026", "elijeuna2026", "pruebasci2026", "prueba2026"}
+
+
 def sembrar_usuarios(db) -> dict[str, list[Usuario]]:
     contrasena = os.environ.get("SEED_PASSWORD", "").strip()
     if not contrasena:
@@ -264,6 +270,13 @@ def sembrar_usuarios(db) -> dict[str, list[Usuario]]:
         contrasena = f"{secrets.token_urlsafe(24)}a1"
     elif not contrasena_valida(contrasena):
         raise SystemExit(f"SEED_PASSWORD no cumple la política de contraseñas: {MENSAJE_CONTRASENA}")
+    elif os.environ.get("APP_ENV", "").lower() == "production" and (
+        contrasena.lower() in CONTRASENAS_PUBLICADAS or len(contrasena) < 12
+    ):
+        raise SystemExit(
+            "SEED_PASSWORD es un valor de ejemplo publicado o tiene menos de 12 caracteres: no se usa en producción. "
+            "Genera una con `python -c \"import secrets; print(secrets.token_urlsafe(18) + 'a1')\"`."
+        )
     hash_comun = hashear_contrasena(contrasena)
     definiciones = [
         ("Coordinación Calles Seguras", "coordinador@ejemplo.mx", RolUsuario.COORDINADOR),

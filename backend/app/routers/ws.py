@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.config import get_settings
+from app.core.red import ip_cliente
 from app.services import tiempo_real
 from app.services.tiempo_real import gestor
 
@@ -17,11 +18,17 @@ async def canal_encharcamientos(ws: WebSocket) -> None:
     Mensajes del servidor: `hola` (al conectar), `ping` (latido), `encharcamiento.creado|actualizado|retirado`.
     El cliente responde `pong` a cada `ping`. Si no hay actividad en dos latidos seguidos, el servidor cierra.
     """
+    ajustes = get_settings()
     origen = ws.headers.get("origin")
-    if origen and origen.rstrip("/") != get_settings().frontend_url.rstrip("/"):
+    if origen and origen.rstrip("/") != ajustes.frontend_url.rstrip("/"):
         await ws.close(code=1008)  # misma política que CORS: sólo el frontend autorizado
         return
-    await gestor.conectar(ws)
+    # Un cliente que no es navegador puede omitir o falsificar Origin: el límite real es el tope de conexiones.
+    ip = ip_cliente(ws)
+    if not gestor.hay_cupo(ip, ajustes.ws_max_conexiones, ajustes.ws_max_conexiones_por_ip):
+        await ws.close(code=1013)  # «intenta más tarde»; el frontend recurre al sondeo HTTP
+        return
+    await gestor.conectar(ws, ip)
     await gestor.enviar(ws, {"tipo": "hola", "heartbeat_segundos": tiempo_real.HEARTBEAT_SEGUNDOS})
     silencios = 0
     try:

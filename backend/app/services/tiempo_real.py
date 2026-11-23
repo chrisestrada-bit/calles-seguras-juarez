@@ -25,6 +25,7 @@ MAX_FIRMAS_RECIENTES = 500
 class GestorConexiones:
     def __init__(self) -> None:
         self._conexiones: dict[WebSocket, asyncio.Lock] = {}
+        self._ips: dict[WebSocket, str] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
         self._firmas: OrderedDict[str, None] = OrderedDict()
         self._candado = threading.Lock()
@@ -36,12 +37,20 @@ class GestorConexiones:
     def total(self) -> int:
         return len(self._conexiones)
 
-    async def conectar(self, ws: WebSocket) -> None:
+    def hay_cupo(self, ip: str, maximo: int, maximo_por_ip: int) -> bool:
+        """M6: sin tope, un cliente (navegador o no) podía abrir conexiones hasta agotar memoria y descriptores."""
+        if len(self._conexiones) >= maximo:
+            return False
+        return sum(1 for otra in self._ips.values() if otra == ip) < maximo_por_ip
+
+    async def conectar(self, ws: WebSocket, ip: str = "") -> None:
         await ws.accept()
         self._conexiones[ws] = asyncio.Lock()
+        self._ips[ws] = ip
 
     def desconectar(self, ws: WebSocket) -> None:
         self._conexiones.pop(ws, None)
+        self._ips.pop(ws, None)
 
     async def enviar(self, ws: WebSocket, datos: dict) -> bool:
         candado = self._conexiones.get(ws)

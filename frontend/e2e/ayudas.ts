@@ -1,9 +1,13 @@
 import { expect, type Page, type BrowserContext } from '@playwright/test'
 
-export const API = `http://localhost:${process.env.E2E_API_PORT ?? '8000'}`
+export const API = `http://localhost:${process.env.E2E_API_PORT ?? '18000'}`
 export const CLAVE = 'Prueba2026e2e'
 /** Contraseña de las cuentas sembradas (db/seed.py); en CI la fija el flujo con SEED_PASSWORD. */
-export const CLAVE_SEMILLA = process.env.SEED_PASSWORD ?? 'Juarez2026'
+export const CLAVE_SEMILLA = (() => {
+  const clave = process.env.SEED_PASSWORD
+  if (!clave) throw new Error('Define SEED_PASSWORD (la misma con la que corriste db/seed.py) para ejecutar las pruebas E2E.')
+  return clave
+})()
 export const TOKEN_KEY = 'calles-seguras.access-token'
 
 export function correoUnico(prefijo = 'e2e'): string {

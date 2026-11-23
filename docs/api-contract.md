@@ -1475,9 +1475,9 @@ Campo opcional `idempotency_key` (UUID) en el cuerpo de cualquiera de los tres t
 
 Para `estado_nuevo: "Rechazado"` es obligatorio `motivo_id` (motivo **activo** de `GET /api/v1/catalogos/motivos-rechazo`); `motivo` pasa a ser un detalle opcional (máx. 300). Sin `motivo_id` → `422`; inactivo o inexistente → `422 MOTIVO_NO_AUTORIZADO`.
 
-### 12.2 `POST /api/v1/moderacion/reportes/fusionar` (HU-05.3 · moderador y coordinador)
+### 12.2 `POST /api/v1/moderacion/reportes/fusionar` (HU-05.3 · sólo moderador)
 
-Cuerpo `{ "folio_principal": "BCH-2026-000418", "folio_secundario": "BCH-2026-000421" }`. Respuesta `200`: `{ folio_principal, folio_secundario, estado_secundario: "Rechazado", confirmaciones_transferidas, confirmaciones_principal, registrado_en, mensaje }`. Errores: `404` folio inexistente, `409 SECUNDARIO_NO_FUSIONABLE` / `PRINCIPAL_NO_VALIDO`, `422 FUSION_INVALIDA` (mismo folio, tipos distintos o encharcamientos). `MiReporte` y el detalle de moderación incluyen `folio_principal`.
+Cuerpo `{ "folio_principal": "BCH-2026-000418", "folio_secundario": "BCH-2026-000421" }`. Respuesta `200`: `{ folio_principal, folio_secundario, estado_secundario: "Rechazado", confirmaciones_transferidas, confirmaciones_principal, registrado_en, mensaje }`. Errores: `403 ROL_NO_AUTORIZADO` si el rol no puede rechazar un reporte `Recibido` (RN-05: sólo moderación; antes coordinación lo hacía por esta vía), `404` folio inexistente, `409 SECUNDARIO_NO_FUSIONABLE` / `PRINCIPAL_NO_VALIDO`, `422 FUSION_INVALIDA` (mismo folio, tipos distintos o encharcamientos). `MiReporte` y el detalle de moderación incluyen `folio_principal`.
 
 ### 12.3 Cuadrillas (HU-05.4 · sólo coordinador)
 
@@ -1509,3 +1509,16 @@ Parámetros `origen_latitud`, `origen_longitud`, `destino_latitud`, `destino_lon
 ### 12.8 `GET /api/v1/publico/colonias/{colonia_id}/resumen` (HU-07.2 · público)
 
 `{ colonia, sector, codigo_postal, activa, abiertos, abiertos_por_estado, reparados, tiempo_promedio_reparacion_dias, encharcamientos_activos, criterios, actualizado_en }`. `404` si la colonia no existe.
+
+## 13. Cambios de la auditoría final (rama `fix/registro-y-rate-limit`, API 1.1.1)
+
+| Ruta | Cambio |
+|------|--------|
+| `POST /auth/registro` | Nuevo `429 LIMITE_REGISTROS` con `Retry-After` (10 por hora por IP, `LIMITE_REGISTROS_POR_HORA_IP`). |
+| `POST /auth/login` | `429 DEMASIADOS_INTENTOS` + `Retry-After` tras 5 fallos de la misma cuenta desde la misma IP, o 30 fallos desde una IP, en 15 min. El bloqueo de la cuenta en BD (desde cualquier IP) sube a 20 fallos. |
+| `GET /auth/yo` · `POST /auth/renovar` · `POST /auth/cerrar-sesion` | También para `enlace_municipal` (antes `403`). |
+| `GET /reportes/{folio}/fotos` | `nombre_original` real sólo para quien subió la foto, el autor y moderación; el resto recibe `fotografia-N.jpg/png`. |
+| `POST /reportes/{folio}/fotos` | Las imágenes se guardan sin EXIF/GPS/XMP ni comentarios (se conserva la orientación). Una estructura inválida se rechaza: «La imagen está dañada o no es un JPG/PNG válido.». `tamano_bytes` es el del archivo limpio. |
+| Cualquier ruta | `413 CUERPO_DEMASIADO_GRANDE` si el cuerpo supera `MAX_CUERPO_BYTES` (16 MB). |
+| `POST /moderacion/reportes/fusionar` | `403 ROL_NO_AUTORIZADO` para coordinación (RN-05), ver §12.2. |
+| `WS /ws/encharcamientos` | Cierre `1013` al superar `WS_MAX_CONEXIONES` o `WS_MAX_CONEXIONES_POR_IP`; el cliente recurre al sondeo HTTP. |
