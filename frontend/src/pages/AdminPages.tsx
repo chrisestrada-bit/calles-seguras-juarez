@@ -1,8 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { cargarMotivos } from '../services/catalogos';
+import { FusionarDialog } from '../components/FusionarDialog';
 import { api, ApiError } from '../services/api';
 import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import { antiguedadTexto, fechaHora } from '../utils/formato';
-import type { AuditoriaItem, EstadoReporte, IndicadorSector, IndicadoresLongevidad, IndicadoresResumen, ReporteModeracionDetalle, ReporteModeracionResumen, RespuestaPaginada, TransicionResponse } from '../types/api';
+import type { MotivoRechazo, AuditoriaItem, EstadoReporte, IndicadorSector, IndicadoresLongevidad, IndicadoresResumen, ReporteModeracionDetalle, ReporteModeracionResumen, RespuestaPaginada, TransicionResponse } from '../types/api';
 import { Guard, ErrorMessage, PageIntro, Pagination } from '../components/AdminShared';
 import { Icon, type IconName } from '../components/Icon';
 import { BlockSkeleton, EmptyState, Notice, SeverityBadge, StatusBadge, TableSkeleton, TypeBadge } from '../components/ui';
@@ -12,18 +14,22 @@ const formatDate = fechaHora; // RN-02: siempre en hora de Ciudad Juárez
 const makeQuery = (values: Record<string, string | number | undefined>) => Object.entries(values).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${key}=${encodeURIComponent(value as string | number)}`).join('&');
 
 function TransitionForm({ report, onComplete }: { report: ReporteModeracionResumen; onComplete: (response: TransicionResponse) => void }) {
-  const [next, setNext] = useState<EstadoReporte>(report.transiciones_disponibles[0] ?? report.estado); const [reason, setReason] = useState(''); const [scheduled, setScheduled] = useState(''); const [repaired, setRepaired] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [next, setNext] = useState<EstadoReporte>(report.transiciones_disponibles[0] ?? report.estado); const [reason, setReason] = useState(''); const [motivoId, setMotivoId] = useState(''); const [motivos, setMotivos] = useState<MotivoRechazo[] | null>(null); const [motivosError, setMotivosError] = useState('');
+  useEffect(() => { if (next !== 'Rechazado' || motivos) return; let vivo = true; cargarMotivos().then((m) => { if (vivo) setMotivos(m); }).catch(() => { if (vivo) setMotivosError('No pudimos cargar los motivos de rechazo.'); }); return () => { vivo = false; }; }, [next, motivos]); const [scheduled, setScheduled] = useState(''); const [repaired, setRepaired] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   if (!report.transiciones_disponibles.length) return <p className="field-help">Sin transiciones disponibles para tu rol.</p>;
-  const submit = async (event: FormEvent) => { event.preventDefault(); setError(''); if (next === 'Rechazado' && reason.trim().length < 10) { setError('El motivo del rechazo es obligatorio y debe tener al menos 10 caracteres.'); return; } setBusy(true); try { const response = await api.post<TransicionResponse>(`/api/v1/moderacion/reportes/${encodeURIComponent(report.folio)}/transiciones`, { estado_nuevo: next, motivo: next === 'Rechazado' ? reason.trim() : null, fecha_programada: scheduled || null, fecha_reparacion: repaired || null }); onComplete(response); } catch (exception) { setError(exception instanceof ApiError ? exception.message : 'No fue posible actualizar el reporte.'); } finally { setBusy(false); } };
+  const submit = async (event: FormEvent) => { event.preventDefault(); setError(''); if (next === 'Rechazado' && !motivoId) { setError('Elige el motivo del rechazo del catálogo.'); return; } setBusy(true); try { const response = await api.post<TransicionResponse>(`/api/v1/moderacion/reportes/${encodeURIComponent(report.folio)}/transiciones`, { estado_nuevo: next, motivo_id: next === 'Rechazado' ? Number(motivoId) : null, motivo: next === 'Rechazado' && reason.trim() ? reason.trim() : null, fecha_programada: scheduled || null, fecha_reparacion: repaired || null }); onComplete(response); } catch (exception) { setError(exception instanceof ApiError ? exception.message : 'No fue posible actualizar el reporte.'); } finally { setBusy(false); } };
   return (
+    <>
     <form className="admin-action" onSubmit={submit}>
       <label>Acción<select value={next} onChange={(event) => setNext(event.target.value as EstadoReporte)}>{report.transiciones_disponibles.map((state) => <option key={state}>{state}</option>)}</select></label>
-      {next === 'Rechazado' && <label>Motivo obligatorio<textarea required minLength={10} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explica por qué se rechaza el reporte" /></label>}
+      {next === 'Rechazado' && <><label>Motivo del catálogo<select required value={motivoId} onChange={(event) => setMotivoId(event.target.value)}><option value="">{motivos ? 'Elige un motivo' : 'Cargando motivos…'}</option>{(motivos ?? []).map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></label>{motivosError && <ErrorMessage message={motivosError} />}<label>Detalle (opcional)<textarea maxLength={300} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Agrega contexto para la persona que reportó" /></label></>}
       {next === 'Programado' && <label>Fecha programada<input type="date" value={scheduled} onChange={(event) => setScheduled(event.target.value)} /></label>}
       {next === 'Reparado' && <label>Fecha de reparación<input required type="date" value={repaired} onChange={(event) => setRepaired(event.target.value)} /></label>}
       {error && <ErrorMessage message={error} />}
       <button className={`button ${next === 'Rechazado' ? 'button--danger' : 'button--primary'}`} disabled={busy} type="submit">{busy ? 'Guardando…' : 'Aplicar acción'}</button>
     </form>
+    {report.estado === 'Recibido' && report.tipo_dano !== 'Encharcamiento' && <FusionarDialog folioSecundario={report.folio} onDone={(r) => onComplete({ folio: r.folio_secundario, estado_anterior: 'Recibido', estado: 'Rechazado', fecha_reparacion: null, longevidad_dias: null, registrado_en: r.registrado_en, mensaje: `${r.mensaje} Se sumaron ${r.confirmaciones_transferidas} confirmación(es) al principal.` })} />}
+    </>
   );
 }
 

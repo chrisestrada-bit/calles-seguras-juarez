@@ -3,7 +3,7 @@ from datetime import date
 from pydantic import BaseModel
 
 from app.models import EstadoReporte, Severidad, TipoDano
-from app.schemas.comun import ColoniaRef, FechaLocal, SectorRef
+from app.schemas.comun import ColoniaRef, FechaLocal, SectorRef, Ubicacion
 
 
 class Periodo(BaseModel):
@@ -70,3 +70,20 @@ class IndicadoresModeracion(BaseModel):
     tasa_rechazo_pct: float
     reportes_forzados_como_nuevos: int
     encharcamientos_rechazados: int
+
+
+class PuntoRecurrenteOut(BaseModel):
+    ubicacion: Ubicacion
+    calle: str
+    colonia: ColoniaRef
+    dias_distintos_anio: int
+    total_reportes: int
+    ultima_ocurrencia: FechaLocal
+    folios: list[str]
+
+
+class PuntosRecurrentes(BaseModel):
+    anio: int
+    radio_metros: int
+    minimo_dias: int
+    datos: list[PuntoRecurrenteOut]

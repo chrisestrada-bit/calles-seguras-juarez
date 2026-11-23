@@ -1,5 +1,6 @@
 """Esquemas de reportes. Los esquemas *Publico no contienen datos del ciudadano reportante (RN-04)."""
 
+import uuid
 from datetime import date
 from typing import Annotated, Any, Literal
 
@@ -36,6 +37,8 @@ class _ReporteBase(Esquema):
     referencia: str | None = Field(default=None, max_length=200)
     descripcion: str | None = Field(default=None, max_length=500)  # HU-02.2: máximo 500
     forzar_nuevo: bool = False
+    # HU-08.4: identificador idempotente generado en el dispositivo (borradores sin conexión).
+    idempotency_key: uuid.UUID | None = None
 
     @field_validator("referencia", "descripcion")
     @classmethod
@@ -138,6 +141,12 @@ class ReporteResumenPublico(BaseModel):
     longevidad_dias: int | None
     vigencia: Vigencia | None
     nivel_agua: str | None = None
+    # HU-03.4: sólo en encharcamientos (null en pavimento).
+    es_punto_recurrente: bool | None = None
+    dias_distintos_anio: int | None = None
+    ultima_ocurrencia: FechaLocal | None = None
+    # HU-01.4: sólo con sesión y colonias de interés; true si es de una de «Tus colonias».
+    en_tus_colonias: bool | None = None
 
 
 class ReportePublico(ReporteResumenPublico):
@@ -204,6 +213,8 @@ class MiReporte(BaseModel):
     colonia: ColoniaRef
     created_at: FechaLocal
     motivo_rechazo: str | None
+    # HU-05.3: si se fusionó como duplicado, folio del reporte al que hay que darle seguimiento.
+    folio_principal: str | None = None
     longevidad_dias: int | None
     es_mio: Literal[True] = True
 
@@ -214,3 +225,28 @@ class ConfirmacionOut(BaseModel):
     estado_reporte: EstadoReporte
     vigencia: Vigencia | None
     mensaje: str
+
+
+# --------------------------------------------------------------------------- mapa (HU-04.5)
+
+
+class MarcadorMapa(BaseModel):
+    """Punto público del mapa: sin datos de la persona reportante (RN-04)."""
+
+    folio: str
+    tipo_dano: TipoDano
+    estado: EstadoReporte
+    etiqueta_publica: str | None
+    severidad: Severidad
+    ubicacion: Ubicacion
+    calle: str
+    colonia: ColoniaRef
+    nivel_agua: str | None = None
+    created_at: FechaLocal
+
+
+class MapaRespuesta(BaseModel):
+    total: int
+    mostrados: int
+    limite: int
+    datos: list[MarcadorMapa]

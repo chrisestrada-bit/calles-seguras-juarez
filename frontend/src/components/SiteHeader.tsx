@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from './Icon';
 import { ThemeToggle } from './ThemeToggle';
+import { CampanaNotificaciones } from './CampanaNotificaciones';
+import { InstalarApp } from './InstalarApp';
 
 type Enlace = { href: string; texto: string; icon: IconName };
 
-const ROL_TEXTO: Record<string, string> = { ciudadano: 'Ciudadano', moderador: 'Moderador', coordinador: 'Coordinador' };
+const ROL_TEXTO: Record<string, string> = { ciudadano: 'Ciudadano', moderador: 'Moderador', coordinador: 'Coordinador', enlace_municipal: 'Enlace municipal' };
 
 function actual(href: string) {
   const path = window.location.pathname;
@@ -42,23 +44,31 @@ export function SiteHeader() {
   const publicos: Enlace[] = [
     { href: '/', texto: 'Reportes públicos', icon: 'layers' },
     { href: '/mi-zona', texto: 'Mi zona', icon: 'locate' },
-    ...(autenticado ? [{ href: '/mis-reportes', texto: 'Mis reportes', icon: 'inbox' as IconName }] : []),
+    { href: '/trayecto', texto: 'Mi trayecto', icon: 'route' },
+    { href: '/resumen-colonia', texto: 'Por colonia', icon: 'chart' },
+    ...(autenticado && rol !== 'enlace_municipal' ? [{ href: '/mis-reportes', texto: 'Mis reportes', icon: 'inbox' as IconName }, { href: '/perfil', texto: 'Mi perfil', icon: 'star' as IconName }] : []),
   ];
   const gestion: Enlace[] = [
     ...(rol === 'moderador' || rol === 'coordinador' ? [{ href: '/moderacion', texto: 'Moderación', icon: 'shield' as IconName }] : []),
     ...(rol === 'coordinador' ? [
       { href: '/coordinacion', texto: 'Coordinación', icon: 'wrench' as IconName },
+      { href: '/cuadrillas', texto: 'Cuadrillas', icon: 'users' as IconName },
+      { href: '/admin/catalogos', texto: 'Catálogos', icon: 'tag' as IconName },
+      { href: '/puntos-recurrentes', texto: 'Puntos recurrentes', icon: 'repeat' as IconName },
       { href: '/admin/colonias', texto: 'Colonias', icon: 'pin' as IconName },
       { href: '/admin/usuarios', texto: 'Usuarios', icon: 'user' as IconName },
     ] : []),
     ...(rol === 'moderador' || rol === 'coordinador' ? [{ href: '/dashboard', texto: 'Dashboard', icon: 'chart' as IconName }] : []),
     ...(rol === 'coordinador' ? [{ href: '/auditoria', texto: 'Auditoría', icon: 'history' as IconName }] : []),
+    ...(rol === 'enlace_municipal' ? [{ href: '/enlace', texto: 'Mis cuadrillas', icon: 'wrench' as IconName }] : []),
   ];
 
   return (
     <header className="site-header">
       <div className="site-header__inner">
         <Marca />
+        <InstalarApp />
+        {autenticado && rol !== 'enlace_municipal' && <CampanaNotificaciones />}
         <ThemeToggle />
         <button className="menu-toggle" type="button" aria-expanded={abierto} aria-controls="menu-principal" onClick={() => setAbierto((v) => !v)}>
           <Icon name={abierto ? 'close' : 'menu'} size={22} /><span>{abierto ? 'Cerrar' : 'Menú'}</span>
@@ -70,7 +80,7 @@ export function SiteHeader() {
             </ul>
           </nav>
           <div className="session-actions">
-            {autenticado && <a className="button button--primary" href="/reportar" aria-current={actual('/reportar')}><Icon name="plus" size={18} />Reportar daño</a>}
+            {autenticado && rol !== 'enlace_municipal' && <a className="button button--primary" href="/reportar" aria-current={actual('/reportar')}><Icon name="plus" size={18} />Reportar daño</a>}
             {autenticado ? (
               <>
                 <span className="session-user"><span className="session-user__avatar" aria-hidden="true">{usuario?.nombre?.trim().charAt(0).toUpperCase() || '·'}</span><span className="session-user__meta"><span className="session-user__name">{usuario?.nombre}</span><span className="session-user__role">{ROL_TEXTO[rol ?? ''] ?? rol}</span></span></span>

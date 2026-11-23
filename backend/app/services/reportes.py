@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 from sqlalchemy import Float, case, func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errores import ErrorAPI, fuera_de_juarez
@@ -23,7 +24,7 @@ from app.models import (
 )
 from app.schemas.comun import ParametrosPagina
 from app.schemas.reportes import BacheIn, EncharcamientoIn, ReporteCrear, ReporteEditar
-from app.services import geo
+from app.services import catalogos_admin, geo
 from app.services.folios import generar_folio
 from app.services.historial import fijar_contexto
 from app.services.presentacion import etiqueta_publica
@@ -138,8 +139,20 @@ def _verificar_limite_por_hora(db: Session, usuario: Usuario) -> None:
 # --------------------------------------------------------------------------- creación
 
 
+def _por_clave(db: Session, usuario: Usuario, clave) -> Reporte | None:
+    if clave is None:
+        return None
+    return db.scalar(select(Reporte).where(Reporte.usuario_id == usuario.id, Reporte.idempotency_key == clave))
+
+
 def crear_reporte(db: Session, usuario: Usuario, payload: ReporteCrear) -> Reporte:
+    # HU-08.4: reenviar el mismo borrador offline devuelve el reporte ya creado (sin folio nuevo ni tope RN-08).
+    previo = _por_clave(db, usuario, payload.idempotency_key)
+    if previo is not None:
+        previo._reutilizado = True  # type: ignore[attr-defined]
+        return previo
     tipo = TipoDano(payload.tipo_dano)
+    catalogos_admin.exigir_tipo_activo(db, tipo)  # HU-06.3: no se aceptan tipos desactivados
     verificar_territorio(payload.latitud, payload.longitud)  # RN-01 (defensa en profundidad)
 
     colonia = db.get(Colonia, payload.colonia_id)
@@ -193,13 +206,22 @@ def crear_reporte(db: Session, usuario: Usuario, payload: ReporteCrear) -> Repor
         vigente_hasta=creado + VIGENCIA if es_enc else None,
         ciclo_vigencia=0,
         forzado_como_nuevo=payload.forzar_nuevo,
+        idempotency_key=payload.idempotency_key,
         created_at=creado,  # RN-10: inmutable desde aquí
         updated_at=creado,
     )
     fijar_contexto(db, usuario_id=usuario.id, origen=OrigenCambio.CIUDADANO, fecha_evento=creado)
     db.add(reporte)
-    db.flush()
-    db.commit()
+    try:
+        db.flush()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        carrera = _por_clave(db, usuario, payload.idempotency_key)  # dos envíos simultáneos del mismo borrador
+        if carrera is None:
+            raise
+        carrera._reutilizado = True  # type: ignore[attr-defined]
+        return carrera
     return reporte
 
 
@@ -211,6 +233,14 @@ def obtener_visible(db: Session, folio: str) -> Reporte:
     reporte = db.scalar(
         select(Reporte).where(Reporte.folio == folio, Reporte.estado != EstadoReporte.RECHAZADO)
     )
+    if reporte is None:
+        raise ErrorAPI(404, "NO_ENCONTRADO", f"No existe un reporte con el folio {folio}.")
+    return reporte
+
+
+def obtener_por_folio(db: Session, folio: str) -> Reporte:
+    """Búsqueda sin filtro de visibilidad: el llamador decide quién puede ver el reporte (p. ej. fotos)."""
+    reporte = db.scalar(select(Reporte).where(Reporte.folio == folio))
     if reporte is None:
         raise ErrorAPI(404, "NO_ENCONTRADO", f"No existe un reporte con el folio {folio}.")
     return reporte
@@ -229,8 +259,7 @@ def historial_publico(db: Session, reporte: Reporte) -> list[HistorialEstado]:
 _RANGO_SEVERIDAD = case({Severidad.ALTA: 3, Severidad.MEDIA: 2}, value=Reporte.severidad, else_=1)
 
 
-def listar_publicos(
-    db: Session,
+def condiciones_publicas(
     *,
     tipos: list[TipoDano] | None,
     estados: list[EstadoReporte] | None,
@@ -241,9 +270,8 @@ def listar_publicos(
     bbox: str | None,
     desde: date | None,
     hasta: date | None,
-    orden: str,
-    pag: ParametrosPagina,
-) -> tuple[list[Reporte], int]:
+) -> list:
+    """Filtros de HU-04.2 compartidos por la lista, el mapa (HU-04.5) y la exportación (HU-07.3)."""
     if estados and EstadoReporte.RECHAZADO in estados:
         raise error_validacion("estado", "El estado «Rechazado» no está disponible en consultas públicas.")
     validar_rango_fechas(desde, hasta)
@@ -275,12 +303,27 @@ def listar_publicos(
         condiciones.append(fecha_local_sql(Reporte.created_at) >= desde)
     if hasta:
         condiciones.append(fecha_local_sql(Reporte.created_at) <= hasta)
+    return condiciones
 
-    ordenes = {
-        "recientes": [Reporte.created_at.desc()],
-        "longevidad": [Reporte.created_at.asc()],
-        "severidad": [_RANGO_SEVERIDAD.desc(), Reporte.created_at.desc()],
-    }
+
+_ORDENES = {
+    "recientes": lambda: [Reporte.created_at.desc()],
+    "longevidad": lambda: [Reporte.created_at.asc()],
+    "severidad": lambda: [_RANGO_SEVERIDAD.desc(), Reporte.created_at.desc()],
+}
+
+
+def listar_publicos(
+    db: Session,
+    *,
+    orden: str,
+    pag: ParametrosPagina,
+    prioridad_colonias: list[int] | None = None,
+    **filtros,
+) -> tuple[list[Reporte], int]:
+    """`prioridad_colonias` (HU-01.4): los reportes de esas colonias van primero, sin ocultar el resto."""
+    condiciones = condiciones_publicas(**filtros)
+    prioridad = [case((Reporte.colonia_id.in_(prioridad_colonias), 0), else_=1)] if prioridad_colonias else []
     total = db.scalar(
         select(func.count()).select_from(Reporte).join(Colonia, Reporte.colonia_id == Colonia.id).where(*condiciones)
     ) or 0
@@ -288,9 +331,25 @@ def listar_publicos(
         select(Reporte)
         .join(Colonia, Reporte.colonia_id == Colonia.id)
         .where(*condiciones)
-        .order_by(*ordenes[orden], Reporte.id.desc())
+        .order_by(*prioridad, *_ORDENES[orden](), Reporte.id.desc())
         .limit(pag.por_pagina)
         .offset(pag.offset)
+    ).all()
+    return list(filas), total
+
+
+def listar_sin_paginar(db: Session, *, orden: str, limite: int, **filtros) -> tuple[list[Reporte], int]:
+    """Todos los reportes que cumplen los filtros (hasta `limite`) y el total real. Para mapa y exportación."""
+    condiciones = condiciones_publicas(**filtros)
+    total = db.scalar(
+        select(func.count()).select_from(Reporte).join(Colonia, Reporte.colonia_id == Colonia.id).where(*condiciones)
+    ) or 0
+    filas = db.scalars(
+        select(Reporte)
+        .join(Colonia, Reporte.colonia_id == Colonia.id)
+        .where(*condiciones)
+        .order_by(*_ORDENES[orden](), Reporte.id.desc())
+        .limit(limite)
     ).all()
     return list(filas), total
 
@@ -323,7 +382,10 @@ __all__ = [
     "crear_reporte",
     "historial_publico",
     "listar_mios",
+    "condiciones_publicas",
     "listar_publicos",
+    "listar_sin_paginar",
+    "obtener_por_folio",
     "obtener_visible",
     "radio_duplicados",
     "verificar_territorio",
@@ -372,3 +434,14 @@ def editar_reporte(db: Session, usuario: Usuario, folio: str, datos: ReporteEdit
     db.commit()
     db.refresh(reporte)
     return reporte
+
+
+def anotar_principales(db: Session, filas: list[Reporte]) -> None:
+    """HU-05.3: deja en cada reporte fusionado el folio de su reporte principal (para «Mis reportes»)."""
+    ids = {r.reporte_principal_id for r in filas if r.reporte_principal_id}
+    if not ids:
+        return
+    folios = dict(db.execute(select(Reporte.id, Reporte.folio).where(Reporte.id.in_(ids))).all())
+    for r in filas:
+        if r.reporte_principal_id:
+            r._folio_principal = folios.get(r.reporte_principal_id)  # type: ignore[attr-defined]

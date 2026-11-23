@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tiempo import ahora_utc
 from app.models import EstadoReporte, OrigenCambio, Reporte, TipoDano
+from app.services import tiempo_real
 from app.services.historial import fijar_contexto
 
 HORAS_VIGENCIA = 6
@@ -43,6 +44,8 @@ def expirar_vencidos(db: Session) -> int:
         reporte.estado = EstadoReporte.HISTORICO
         db.flush()
     db.commit()
+    for reporte in vencidos:  # HU-08.3: avisa a quienes tienen la consulta abierta
+        tiempo_real.emitir(db, reporte, "actualizado")
     return len(vencidos)
 
 

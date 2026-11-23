@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { LoginResponse, Rol, UsuarioResumen } from '../types/api';
 import { AuthContext } from './authContexto';
 import { api, configurarSesionExpirada, eliminarToken, guardarToken, obtenerToken } from '../services/api';
+import { limpiarCachesSensibles } from '../services/offline';
 
 const USUARIO_KEY = 'calles-seguras.usuario';
 const INACTIVIDAD_MS = 30 * 60 * 1000;
@@ -16,6 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const cerrarSesionLocal = useCallback(() => {
     eliminarToken();
+    limpiarCachesSensibles(); // HU-08.4: nada de lo consultado queda en caché al cerrar sesión
     localStorage.removeItem(USUARIO_KEY);
     setToken(null);
     setUsuario(null);

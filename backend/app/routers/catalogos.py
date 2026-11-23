@@ -12,7 +12,9 @@ from app.schemas.catalogos import (
     SectorCatalogo,
 )
 from app.schemas.comun import Pagina, ParametrosPagina, armar_pagina, respuestas
+from app.schemas.operacion import ListaMotivos, MotivoRechazo
 from app.services import catalogos as servicio
+from app.services import catalogos_admin
 
 router = APIRouter(prefix="/catalogos", tags=["catalogos"])
 
@@ -50,9 +52,23 @@ def colonias(
     return armar_pagina([colonia_catalogo(c) for c in filas], total, pag)
 
 
-@router.get("/tipos-dano", response_model=CatalogoTiposDano, summary="Formulario dinámico por tipo de daño")
-def tipos_dano() -> dict:
-    return servicio.tipos_dano()
+@router.get("/tipos-dano", response_model=CatalogoTiposDano, summary="Formulario dinámico de los tipos de daño ACTIVOS")
+def tipos_dano(db: Session = Depends(get_db)) -> dict:
+    base = servicio.tipos_dano()
+    activos = {t.clave.value: t for t in catalogos_admin.tipos(db, solo_activos=True)}  # HU-06.3
+    base["datos"] = [
+        {**d, "nombre": activos[d["tipo_dano"]].nombre, "descripcion": activos[d["tipo_dano"]].descripcion}
+        for d in base["datos"]
+        if d["tipo_dano"] in activos
+    ]
+    return base
+
+
+@router.get("/motivos-rechazo", response_model=ListaMotivos, summary="Motivos de rechazo activos (HU-06.3)")
+def motivos_rechazo(db: Session = Depends(get_db)) -> ListaMotivos:
+    return ListaMotivos(
+        datos=[MotivoRechazo(id=m.id, nombre=m.nombre, descripcion=m.descripcion, activo=m.activo) for m in catalogos_admin.motivos(db, solo_activos=True)]
+    )
 
 
 @router.get("/estados", response_model=CatalogoEstados, summary="Estados y transiciones permitidas")

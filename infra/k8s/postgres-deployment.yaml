@@ -1,0 +1,66 @@
+# PostgreSQL de una sola réplica. `Recreate` evita que dos pods monten el mismo volumen durante una actualización.
+# Para producción real conviene un servicio administrado o un operador (réplicas, respaldos); esto es el Plan B local.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: calles-seguras-juarez
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: calles-seguras-juarez
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: pg
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom: { configMapKeyRef: { name: calles-seguras-config, key: POSTGRES_DB } }
+            - name: POSTGRES_USER
+              valueFrom: { configMapKeyRef: { name: calles-seguras-config, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: calles-seguras-secretos, key: POSTGRES_PASSWORD } }
+            - name: TZ
+              value: UTC
+            # Subcarpeta: el punto de montaje suele traer `lost+found` y PostgreSQL exige un directorio vacío.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+      volumes:
+        - name: datos
+          persistentVolumeClaim:
+            claimName: postgres-datos

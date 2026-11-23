@@ -47,11 +47,25 @@ def usuario_opcional(
     return _usuario_desde_token(db, cred)
 
 
+def _cuenta_suspendida(db: Session, cred: HTTPAuthorizationCredentials | None) -> bool:
+    """Token con firma y vigencia válidas, pero de una cuenta desactivada por coordinación."""
+    carga = decodificar_token(cred.credentials) if cred else None
+    if carga is None:
+        return False
+    try:
+        usuario = db.get(Usuario, uuid.UUID(str(carga["sub"])))
+    except ValueError:
+        return False
+    return usuario is not None and not usuario.activo
+
+
 def usuario_actual(
     cred: HTTPAuthorizationCredentials | None = Depends(_esquema),
     db: Session = Depends(get_db),
 ) -> Usuario:
     usuario = _usuario_desde_token(db, cred)
+    if usuario is None and _cuenta_suspendida(db, cred):
+        raise ErrorAPI(403, "CUENTA_SUSPENDIDA", "Tu cuenta está suspendida. Comunícate con coordinación.")
     if usuario is None:
         raise ErrorAPI(
             401,
@@ -80,3 +94,4 @@ def requiere_rol(*roles: RolUsuario) -> Callable[..., Usuario]:
 CUALQUIER_ROL = requiere_rol(RolUsuario.CIUDADANO, RolUsuario.MODERADOR, RolUsuario.COORDINADOR)
 MODERACION = requiere_rol(RolUsuario.MODERADOR, RolUsuario.COORDINADOR)
 SOLO_COORDINADOR = requiere_rol(RolUsuario.COORDINADOR)
+SOLO_ENLACE = requiere_rol(RolUsuario.ENLACE_MUNICIPAL)  # HU-05.5

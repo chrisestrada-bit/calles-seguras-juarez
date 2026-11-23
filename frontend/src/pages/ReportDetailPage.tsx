@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../services/api';
 import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from '../components/Icon';
-import { BlockSkeleton, EmptyState, SeverityBadge, StatusBadge, TypeBadge } from '../components/ui';
+import { FotosReporte } from '../components/FotosReporte';
+import { BlockSkeleton, EmptyState, RecurrentBadge, SeverityBadge, StatusBadge, TypeBadge } from '../components/ui';
 import { antiguedadTexto, fechaCalendario, fechaHora as fechaLarga } from '../utils/formato';
 import type { HistorialResponse, ReportePublico } from '../types/api';
 
@@ -44,7 +45,7 @@ export function ReportDetailPage({ folio }: { folio: string }) {
       <div className="detail-layout">
         <article className={`detail-card detail-card--${encharcamiento ? 'water' : 'road'}`}>
           <header className="detail-card__head">
-            <div className="detail-card__badges"><TypeBadge tipo={reporte.tipo_dano} /><StatusBadge estado={reporte.estado} etiqueta={reporte.etiqueta_publica} size="lg" /></div>
+            <div className="detail-card__badges"><TypeBadge tipo={reporte.tipo_dano} /><StatusBadge estado={reporte.estado} etiqueta={reporte.etiqueta_publica} size="lg" />{reporte.es_punto_recurrente && <RecurrentBadge dias={reporte.dias_distintos_anio} />}</div>
             <h1 className="detail-card__street">{reporte.calle}</h1>
             <p className="detail-card__colonia"><Icon name="pin" size={18} />{reporte.colonia.nombre}</p>
             <p className="detail-card__folio">Folio <span className="tabular">{reporte.folio}</span></p>
@@ -68,6 +69,8 @@ export function ReportDetailPage({ folio }: { folio: string }) {
               <p>{reporte.descripcion}</p>
             </section>
           )}
+
+          <FotosReporte folio={reporte.folio} />
 
           {puedeConfirmar && (
             <section className="confirmation-panel" aria-labelledby="confirmaciones-titulo">

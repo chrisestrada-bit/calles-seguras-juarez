@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     geocoding_api_key: SecretStr = SecretStr("")
     geocoding_timeout_seconds: float = 5
 
+    # HU-04.6: servicio de rutas (OSRM). Vacío = siempre línea recta entre origen y destino.
+    routing_api_url: str = "https://router.project-osrm.org"
+    routing_timeout_seconds: float = 6
+
+    # HU-02.4: directorio persistente de fotos (en Docker, un volumen montado). Nunca se sirve como estático.
+    uploads_dir: str = "uploads"
+
     @property
     def es_produccion(self) -> bool:
         return self.app_env.lower() == "production"

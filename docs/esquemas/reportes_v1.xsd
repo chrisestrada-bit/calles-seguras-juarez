@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Esquema de intercambio de reportes (HU-07.3 · Punto extra 4.4) — versión 1.
+  El servidor valida contra este XSD cada exportación antes de entregarla.
+  Privacidad (RN-04): el documento NO incluye nombre, correo, identificadores internos ni datos de la persona reportante.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="https://callesseguras.juarez.mx/esquemas/reportes/v1"
+           targetNamespace="https://callesseguras.juarez.mx/esquemas/reportes/v1"
+           elementFormDefault="qualified">
+
+  <xs:simpleType name="FolioTipo">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(BCH|ENC)-[0-9]{4}-[0-9]{6}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TipoDanoTipo">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Bache"/>
+      <xs:enumeration value="Alcantarilla sin tapa"/>
+      <xs:enumeration value="Encharcamiento"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="EstadoTipo">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Recibido"/>
+      <xs:enumeration value="Validado"/>
+      <xs:enumeration value="Programado"/>
+      <xs:enumeration value="En reparación"/>
+      <xs:enumeration value="Reparado"/>
+      <xs:enumeration value="Activo"/>
+      <xs:enumeration value="Histórico"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TextoCortoTipo">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1"/>
+      <xs:maxLength value="150"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="ReporteTipo">
+    <xs:sequence>
+      <xs:element name="folio" type="FolioTipo"/>
+      <xs:element name="tipo_dano" type="TipoDanoTipo"/>
+      <xs:element name="ubicacion" type="TextoCortoTipo"/>
+      <xs:element name="colonia" type="TextoCortoTipo"/>
+      <xs:element name="estado" type="EstadoTipo"/>
+      <xs:element name="fecha_creacion" type="xs:dateTime"/>
+      <xs:element name="fecha_actualizacion" type="xs:dateTime"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:element name="reportes">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="reporte" type="ReporteTipo" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="version" type="xs:string" use="required"/>
+      <xs:attribute name="generado" type="xs:dateTime" use="required"/>
+      <xs:attribute name="zona_horaria" type="xs:string" use="required"/>
+      <xs:attribute name="total" type="xs:nonNegativeInteger" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

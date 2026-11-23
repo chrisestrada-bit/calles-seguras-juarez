@@ -1,7 +1,12 @@
-import { useState, type FormEvent } from 'react';
-import { api } from '../services/api';
+import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
+import { api, ApiError, descargarArchivo } from '../services/api';
+import { useAuth } from '../context/useAuth';
 import { agruparPorSector, cargarColonias, etiquetaColonia } from '../services/catalogos';
 import { useCargaDatos } from '../hooks/useCargaDatos';
+import { useEncharcamientosEnVivo } from '../hooks/useEncharcamientosEnVivo';
+import { guardarConsulta, leerConsulta, useEnLinea } from '../services/offline';
+import { fusionarEnVivo, PATRON_FOLIO, SIN_FILTROS, type FiltrosLista as Filtros } from '../utils/enVivo';
+import { fechaHora } from '../utils/formato';
 import { ReportCard } from '../components/ReportCard';
 import { ZoneSection } from '../components/ZoneSection';
 import { Pagination } from '../components/AdminShared';
@@ -10,11 +15,22 @@ import { EmptyState, ReportGridSkeleton, TypeGlyph } from '../components/ui';
 import { HeroMap } from '../components/HeroMap';
 import type { ReporteResumenPublico, ReportePublico, RespuestaPaginada, TipoDano, EstadoReporte } from '../types/api';
 
+const MapaReportes = lazy(() => import('../components/MapaReportes').then((m) => ({ default: m.MapaReportes })));
+
 const tipos: TipoDano[] = ['Bache', 'Alcantarilla sin tapa', 'Encharcamiento'];
 const estados: EstadoReporte[] = ['Recibido', 'Validado', 'Programado', 'En reparación', 'Reparado', 'Activo', 'Histórico'];
-const PATRON_FOLIO = /^(BCH|ENC)-\d{4}-\d{6}$/i;
-const SIN_FILTROS = { busqueda: '', tipo: '', estado: '', colonia: '', desde: '', hasta: '' };
-type Filtros = typeof SIN_FILTROS;
+
+/** Filtros de HU-04.2 como query string: los comparten la lista, el mapa y la exportación (HU-04.5, HU-07.3). */
+function paramsFiltros(f: Filtros): URLSearchParams {
+  const params = new URLSearchParams();
+  if (f.busqueda.trim().length >= 3 && !PATRON_FOLIO.test(f.busqueda.trim())) params.set('calle', f.busqueda.trim());
+  if (f.tipo) params.set('tipo_dano', f.tipo);
+  if (f.estado) params.set('estado', f.estado);
+  if (f.colonia) params.set('colonia_id', f.colonia);
+  if (f.desde) params.set('desde', f.desde);
+  if (f.hasta) params.set('hasta', f.hasta);
+  return params;
+}
 
 /** Clave de la consulta: un folio exacto o la URL de la lista con todos los filtros combinados (HU-04.2). */
 function claveDeConsulta(f: Filtros, pagina: number): string {
@@ -30,7 +46,23 @@ function claveDeConsulta(f: Filtros, pagina: number): string {
   return `/api/v1/reportes?${params}`;
 }
 
-async function cargarReportes(clave: string): Promise<RespuestaPaginada<ReporteResumenPublico>> {
+type RespuestaConsulta = RespuestaPaginada<ReporteResumenPublico> & { sincronizado_en?: string };
+
+/** Consulta pública con respaldo local: sin conexión muestra la última consulta guardada y su fecha de sincronización (HU-08.4). */
+async function cargarReportes(claveConRecarga: string): Promise<RespuestaConsulta> {
+  const clave = claveConRecarga.split('#')[0];
+  try {
+    const datos = await consultar(clave);
+    guardarConsulta(clave, datos);
+    return datos;
+  } catch (e) {
+    const guardado = e instanceof ApiError && e.status === 0 ? leerConsulta<RespuestaPaginada<ReporteResumenPublico>>(clave) : null;
+    if (guardado) return { ...guardado.datos, sincronizado_en: guardado.sincronizado_en };
+    throw e;
+  }
+}
+
+async function consultar(clave: string): Promise<RespuestaPaginada<ReporteResumenPublico>> {
   if (!clave.startsWith('folio:')) return api.get<RespuestaPaginada<ReporteResumenPublico>>(clave);
   const d = await api.get<ReportePublico>(`/api/v1/reportes/${clave.slice('folio:'.length)}`);
   const nivel = 'nivel_agua' in d.detalle ? d.detalle.nivel_agua : null;
@@ -43,12 +75,23 @@ async function cargarReportes(clave: string): Promise<RespuestaPaginada<ReporteR
 const cargarCatalogo = () => cargarColonias();
 
 export function PublicHomePage() {
-  const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS); // lo que se está escribiendo
-  const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS); // lo que se consultó
+  // /?colonia=ID (enlace desde /resumen-colonia) abre la consulta ya filtrada.
+  const coloniaUrl = new URLSearchParams(window.location.search).get('colonia') ?? '';
+  const [borrador, setBorrador] = useState<Filtros>({ ...SIN_FILTROS, colonia: coloniaUrl }); // lo que se está escribiendo
+  const [aplicados, setAplicados] = useState<Filtros>({ ...SIN_FILTROS, colonia: coloniaUrl }); // lo que se consultó
   const [pagina, setPagina] = useState(1);
-  const consulta = useCargaDatos(claveDeConsulta(aplicados, pagina), cargarReportes, 'No fue posible cargar los reportes.');
+  const [vista, setVista] = useState<'lista' | 'mapa'>('lista');
+  const [exportando, setExportando] = useState<'csv' | 'xml' | null>(null);
+  const [errorExportar, setErrorExportar] = useState('');
+  const { usuario } = useAuth();
+  const puedeExportar = usuario?.rol === 'moderador' || usuario?.rol === 'coordinador';
+  const { reconexiones } = useEnLinea();
+  const enVivo = useEncharcamientosEnVivo(true);
+  const consulta = useCargaDatos(`${claveDeConsulta(aplicados, pagina)}#${reconexiones}`, cargarReportes, 'No fue posible cargar los reportes.');
   const catalogo = useCargaDatos('colonias', cargarCatalogo, 'No pudimos cargar las colonias.');
-  const reportes = consulta.datos?.datos ?? [];
+  const base = consulta.datos?.datos;
+  // HU-08.3: los eventos en vivo se mezclan sin duplicar folios y respetando los filtros activos.
+  const reportes = useMemo(() => fusionarEnVivo(base ?? [], enVivo.vivos, aplicados, pagina === 1, 20), [base, enVivo.vivos, aplicados, pagina]);
   const totalPaginas = consulta.datos?.paginacion.total_paginas || 1;
   const cargando = consulta.estado === 'cargando';
   const error = consulta.estado === 'error' ? consulta.error : '';
@@ -60,6 +103,12 @@ export function PublicHomePage() {
   const cambiar = (campo: keyof Filtros, valor: string) => {
     setBorrador((actual) => ({ ...actual, [campo]: valor }));
     if (campo !== 'busqueda') aplicar({ ...borrador, [campo]: valor });
+  };
+  const exportar = async (formato: 'csv' | 'xml') => {
+    setExportando(formato); setErrorExportar('');
+    try { await descargarArchivo(`/api/v1/reportes/exportar/${formato}?${paramsFiltros(aplicados)}`, `reportes.${formato}`); }
+    catch (e) { setErrorExportar(e instanceof ApiError ? e.message : 'No fue posible exportar los reportes.'); }
+    finally { setExportando(null); }
   };
   const buscar = (evento: FormEvent) => { evento.preventDefault(); aplicar(borrador); };
   const limpiar = () => { setBorrador(SIN_FILTROS); aplicar(SIN_FILTROS); };
@@ -137,11 +186,56 @@ export function PublicHomePage() {
           </form>
         </section>
 
+        <p className={`live-status live-status--${enVivo.estado}`} role="status"><span className="live-status__dot" aria-hidden="true" /><Icon name={enVivo.estado === 'en_vivo' ? 'rain' : 'clock'} size={16} />{enVivo.estado === 'en_vivo' ? 'En vivo' : enVivo.estado === 'reconectando' ? 'Reconectando' : 'Conectando'}<span className="live-status__hint"> · encharcamientos nuevos sin recargar la página</span></p>
+        {consulta.datos?.sincronizado_en && <div className="notice notice--warning" role="status"><Icon name="alert" size={20} /><div><strong>Sin conexión.</strong> Estás viendo la última consulta guardada el {fechaHora(consulta.datos.sincronizado_en)}. Se actualizará al volver la red.</div></div>}
+        <div className="view-toolbar">
+          <div className="view-toggle" role="group" aria-label="Forma de ver los reportes">
+            <button type="button" className={`button button--sm ${vista === 'lista' ? '' : 'button--secondary'}`} aria-pressed={vista === 'lista'} onClick={() => setVista('lista')}><Icon name="list" size={18} />Lista</button>
+            <button type="button" className={`button button--sm ${vista === 'mapa' ? '' : 'button--secondary'}`} aria-pressed={vista === 'mapa'} onClick={() => setVista('mapa')}><Icon name="map" size={18} />Mapa</button>
+          </div>
+          {puedeExportar && (
+            <div className="export-actions" role="group" aria-label="Exportar los reportes filtrados">
+              <button type="button" className="button button--secondary button--sm" disabled={exportando !== null} onClick={() => void exportar('csv')}><Icon name="download" size={18} />{exportando === 'csv' ? 'Exportando…' : 'Exportar CSV'}</button>
+              <button type="button" className="button button--secondary button--sm" disabled={exportando !== null} onClick={() => void exportar('xml')}><Icon name="download" size={18} />{exportando === 'xml' ? 'Exportando…' : 'Exportar XML'}</button>
+            </div>
+          )}
+        </div>
+        {errorExportar && <div className="form-error" role="alert">{errorExportar}</div>}
+
+        {vista === 'mapa' ? <Suspense fallback={<div className="map-state" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}><MapaReportes filtros={paramsFiltros(aplicados).toString()} onVerLista={() => setVista('lista')} vivos={enVivo.vivos} filtrosLista={aplicados} /></Suspense> : <>
         {cargando ? <ReportGridSkeleton count={6} /> : error ? <div className="form-error" role="alert">{error}</div> : reportes.length === 0
           ? <EmptyState art="search" title="No hay reportes que coincidan con tus filtros" action={<a className="button button--primary" href="/reportar"><Icon name="plus" size={18} />Reportar un daño</a>}>{hayFiltros ? 'Prueba con otra calle, otra colonia u otras fechas, o usa «Limpiar filtros».' : 'Aún no hay reportes públicos. Sé la primera persona en reportar un daño.'}</EmptyState>
-          : <div className="report-grid">{reportes.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>}
+          : <ListaConTusColonias reportes={reportes} />}
         <Pagination page={pagina} total={totalPaginas} onChange={setPagina} label="Paginación de reportes" />
+        </>}
       </section>
     </main>
+  );
+}
+
+/** HU-01.4: con colonias de interés, primero «Tus colonias» y después el resto de la ciudad (nada se oculta). */
+function ListaConTusColonias({ reportes }: { reportes: ReporteResumenPublico[] }) {
+  const tuyas = reportes.filter((r) => r.en_tus_colonias);
+  if (tuyas.length === 0 || tuyas.length === reportes.length && !reportes.some((r) => r.en_tus_colonias === false)) {
+    return <div className="report-grid">{reportes.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>;
+  }
+  const resto = reportes.filter((r) => !r.en_tus_colonias);
+  return (
+    <>
+      <section aria-labelledby="tus-colonias-titulo" className="tus-colonias">
+        <div className="tus-colonias__head">
+          <h3 id="tus-colonias-titulo"><Icon name="star" size={18} />Tus colonias</h3>
+          {resto.length > 0 && <a className="link-button" href="#resto-titulo">Ver el resto de la ciudad ({resto.length})</a>}
+          <a className="link-button" href="/perfil">Editar mis colonias</a>
+        </div>
+        <div className="report-grid">{tuyas.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>
+      </section>
+      {resto.length > 0 && (
+        <section aria-labelledby="resto-titulo">
+          <h3 id="resto-titulo" className="tus-colonias__resto">Resto de la ciudad</h3>
+          <div className="report-grid">{resto.map((r) => <ReportCard key={r.folio} reporte={r} />)}</div>
+        </section>
+      )}
+    </>
   );
 }

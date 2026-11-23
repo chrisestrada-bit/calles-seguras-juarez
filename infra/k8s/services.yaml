@@ -1,0 +1,52 @@
+# Servicios internos (ClusterIP). Se accede desde la máquina con `kubectl port-forward` (docs/kubernetes.md).
+# En un clúster en la nube, expón `frontend` y `backend` con un Ingress o un Service de tipo LoadBalancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: calles-seguras-juarez
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: pg
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: calles-seguras-juarez
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: calles-seguras
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: calles-seguras-juarez
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

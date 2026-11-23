@@ -1,6 +1,6 @@
 import type { ReporteResumenPublico } from '../types/api';
 import { Icon } from './Icon';
-import { SeverityBadge, StatusBadge, TypeBadge } from './ui';
+import { RecurrentBadge, SeverityBadge, StatusBadge, TypeBadge } from './ui';
 import { antiguedadTexto, distanciaTexto, tonoDeTipo } from '../utils/formato';
 
 /** `distanciaMetros` sólo se pasa en «¿Cómo está mi zona?» (HU-04.3). */
@@ -19,6 +19,7 @@ export function ReportCard({ reporte, distanciaMetros }: { reporte: ReporteResum
         <p className="report-card__colonia"><Icon name="pin" size={16} />{reporte.colonia?.nombre ?? 'Colonia sin registrar'}</p>
         {distanciaMetros !== undefined && <p className="report-card__colonia"><Icon name="locate" size={16} /><span><span className="visually-hidden">Distancia: </span>a <span className="tabular">{distanciaTexto(distanciaMetros)}</span></span></p>}
         {encharcamiento && reporte.nivel_agua && !intransitable && <p className="report-card__colonia"><Icon name="water" size={16} />Nivel del agua: {reporte.nivel_agua}</p>}
+        {encharcamiento && reporte.es_punto_recurrente && <p className="report-card__colonia"><RecurrentBadge dias={reporte.dias_distintos_anio} /></p>}
         <p className="report-card__folio">Folio <span className="tabular">{reporte.folio}</span></p>
       </div>
       {encharcamiento && reporte.vigencia && (

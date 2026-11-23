@@ -1,0 +1,49 @@
+/* ==========================================================================
+   Fase 3: fusión (modal), cuadrillas/enlace, catálogos, perfil, trayecto y resumen por colonia.
+   Usa los tokens del sistema visual (modo claro y oscuro); el estado nunca se comunica sólo con color.
+   ========================================================================== */
+
+/* ——— Modal de confirmación (HU-05.3) ——— */
+.modal { width: min(32rem, calc(100vw - 2rem)); padding: var(--s-5); border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-3, 0 24px 48px rgb(5 10 21 / 0.35)); }
+.modal::backdrop { background: rgb(5 10 21 / 0.55); }
+.modal h2 { margin-top: 0; font-size: var(--text-lg); }
+.modal form, .modal > div { display: grid; gap: var(--s-3); }
+.modal__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
+.modal__resumen { display: grid; gap: var(--s-2); margin: 0; }
+.modal__resumen > div { padding: var(--s-3); border: 1px solid var(--border-strong); border-radius: 10px; }
+.modal__resumen dt { font-size: var(--text-sm); color: var(--ink-2); }
+.modal__resumen dd { margin: 0; font-size: var(--text-lg); font-weight: 800; }
+
+/* ——— Chips (estado con ícono + texto) ——— */
+.chip-list { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: 0.3rem 0.75rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); font-size: var(--text-sm); font-weight: 650; }
+.chip--inactive { border-style: dashed; color: var(--ink-2); background: var(--surface-3); }
+.chip__note { flex-basis: 100%; font-weight: 400; color: var(--ink-3); }
+.cell-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.admin-table input { width: 100%; min-width: 9rem; }
+.checkbox-row { display: inline-flex; align-items: center; gap: var(--s-2); margin-block: var(--s-3); }
+
+/* ——— Buscador de colonias y perfil (HU-01.4) ——— */
+.colonia-search { display: grid; gap: var(--s-2); }
+.tus-colonias { margin-bottom: var(--s-6, 2rem); padding: var(--s-4); border: 2px solid var(--route-600); border-radius: 18px; background: var(--route-50); }
+.tus-colonias__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-4); margin-bottom: var(--s-3); }
+.tus-colonias__head h3 { display: inline-flex; align-items: center; gap: var(--s-2); margin: 0; }
+.tus-colonias__resto { margin-top: var(--s-5); }
+[data-theme="dark"] .tus-colonias { background: var(--surface-2); }
+
+/* ——— Resumen por colonia (HU-07.2) ——— */
+.criterios-list { display: grid; gap: var(--s-2); margin: var(--s-4) 0; }
+.criterios-list > div { display: grid; gap: var(--s-1); padding: var(--s-2) 0; border-bottom: 1px solid var(--border); }
+.criterios-list dt { font-weight: 700; }
+.criterios-list dd { margin: 0; color: var(--ink-2); }
+
+/* ——— Trayecto (HU-04.6) ——— */
+.trayecto-form { display: grid; gap: var(--s-4); }
+@media (min-width: 60em) { .trayecto-form { grid-template-columns: 1fr 1fr; } .trayecto-form > .button { grid-column: 1 / -1; justify-self: start; } }
+.trayecto-punto { display: grid; gap: var(--s-2); min-width: 0; margin: 0; padding: var(--s-3) var(--s-4); border: 1px solid var(--border-strong); border-radius: 12px; }
+.trayecto-punto legend { padding: 0 var(--s-2); font-weight: 800; }
+.trayecto-lista { display: grid; gap: var(--s-2); margin: var(--s-3) 0 0; padding: 0; list-style: none; }
+.trayecto-lista li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.trayecto-lista li.is-critical { border: 2px solid var(--manhole-700); background: var(--manhole-50); }
+[data-theme="dark"] .trayecto-lista li.is-critical { background: var(--surface-2); }
+@media (max-width: 30em) { .trayecto-lista li { grid-template-columns: auto 1fr; } .trayecto-lista li > a { grid-column: 2; } }

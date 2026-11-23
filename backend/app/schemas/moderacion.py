@@ -42,6 +42,8 @@ class ReporteModeracion(ReporteModeracionItem):
     descripcion: str | None
     detalle: DetalleBache | DetalleAlcantarilla | DetalleEncharcamiento
     motivo_rechazo: str | None
+    # HU-05.3: si se fusionó como duplicado, folio del reporte principal.
+    folio_principal: str | None = None
     fecha_programada: date | None
     fecha_reparacion: date | None
     historial: list[HistorialModeracionItem]
@@ -51,14 +53,16 @@ class TransicionIn(Esquema):
     estado_nuevo: EstadoReporte
     fecha_reparacion: date | None = None
     fecha_programada: date | None = None
-    motivo: str | None = Field(default=None, max_length=500)
+    # HU-06.3: al rechazar se elige un motivo ACTIVO del catálogo; `motivo` es un detalle opcional.
+    motivo_id: int | None = Field(default=None, ge=1)
+    motivo: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")
     def _campos_requeridos(self) -> "TransicionIn":
-        if self.estado_nuevo == EstadoReporte.RECHAZADO and (
-            self.motivo is None or len(self.motivo) < 10
-        ):
-            raise ValueError("El motivo de rechazo es obligatorio (mínimo 10 caracteres).")
+        if self.estado_nuevo == EstadoReporte.RECHAZADO and self.motivo_id is None:
+            raise ValueError("Elige el motivo del rechazo del catálogo (motivo_id).")
+        if self.estado_nuevo != EstadoReporte.RECHAZADO and self.motivo_id is not None:
+            raise ValueError("El motivo sólo se indica al rechazar.")
         return self
 
 

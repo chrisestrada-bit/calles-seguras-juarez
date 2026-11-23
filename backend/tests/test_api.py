@@ -12,6 +12,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.tiempo import hoy_local
 from tests.conftest import (
+    motivo_id,
     CONTRASENA,
     crear_cuenta,
     crear_reporte,
@@ -294,15 +295,15 @@ def test_rechazo_exige_motivo_y_oculta_el_reporte(client, ciudadano, moderador):
     lat, lon = punto_unico()
     folio = crear_reporte(client, ciudadano, payload_bache(client, lat, lon))["folio"]
     assert transicionar(client, moderador, folio, estado_nuevo="Rechazado").status_code == 422
-    assert transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo="corto").status_code == 422
-    ok = transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo="El punto está en un predio privado.")
+    assert transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo="El punto está en un predio privado.").status_code == 422  # sin motivo del catálogo (HU-06.3)
+    ok = transicionar(client, moderador, folio, estado_nuevo="Rechazado", motivo_id=motivo_id(client), motivo="El punto está en un predio privado.")
     assert ok.status_code == 200
     assert client.get(f"{API}/reportes/{folio}").status_code == 404  # RN-09
     assert client.get(f"{API}/reportes/{folio}/historial").status_code == 404
     todos = client.get(f"{API}/reportes", params={"por_pagina": 100}).json()["datos"]
     assert folio not in {r["folio"] for r in todos}
     mios = client.get(f"{API}/reportes/mios", headers=ciudadano.h).json()["datos"]
-    assert mios[0]["folio"] == folio and mios[0]["motivo_rechazo"].startswith("El punto")
+    assert mios[0]["folio"] == folio and mios[0]["motivo_rechazo"] == "Información insuficiente: El punto está en un predio privado."
     assert client.get(f"{API}/reportes", params={"estado": "Rechazado"}).status_code == 422
     cola = client.get(f"{API}/moderacion/reportes", params={"estado": "Rechazado", "autor_id": ciudadano.id}, headers=moderador.h).json()
     assert cola["datos"][0]["transiciones_disponibles"] == []

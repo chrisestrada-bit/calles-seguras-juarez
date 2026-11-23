@@ -359,6 +359,51 @@ Restricciones:
 
 Estrategia: *upsert* por `clave_consulta`. Si el proveedor falla y existe caché vencida, se sirve marcada como `desactualizado: true`; si no hay caché, `503`.
 
+### 4.8 `reporte_fotos` (HU-02.4)
+
+| Columna | Tipo | Nulo | Default | Restricciones / notas |
+|---------|------|------|---------|-----------------------|
+| `id` | `UUID` | No | `gen_random_uuid()` | PK; es el `foto_id` público. |
+| `reporte_id` | `BIGINT` | No | — | FK → `reportes.id` (`RESTRICT`). |
+| `usuario_id` | `UUID` | No | — | FK → `usuarios.id`. Nunca se expone (RN-04). |
+| `ruta_almacenamiento` | `VARCHAR(80)` | No | — | `UNIQUE`. Nombre de archivo `UUIDv4` + `.jpg`/`.png`; no se deriva del nombre original. |
+| `nombre_original` | `VARCHAR(150)` | No | — | Sólo se muestra como texto; se sanea (sin rutas ni `<>"`). |
+| `mime_type` | `VARCHAR(20)` | No | — | `CHECK IN ('image/jpeg','image/png')`; se detecta por *magic bytes*, no por el cliente. |
+| `tamano_bytes` | `INTEGER` | No | — | `CHECK (> 0 AND <= 5242880)` (5 MB). |
+| `created_at` | `TIMESTAMPTZ` | No | `now()` | Inmutable (RN-10): el trigger `trg_reporte_fotos_inmutable` rechaza todo `UPDATE`. |
+
+Límite: **3 fotos por persona y reporte** (se valida con candado de fila `SELECT … FOR UPDATE` para que dos solicitudes simultáneas no lo superen). Sólo suben fotos quien creó el reporte o quien lo confirmó (HU-02.3). Los archivos viven en `UPLOADS_DIR` (volumen `uploads` en Docker); **nunca** se sirven como estáticos.
+
+**Acceso a la imagen** (`GET /api/v1/reportes/{folio}/fotos/{foto_id}`): mientras el reporte esté `Recibido`, sólo lo ven su autor, moderación y coordinación (`403` para visitantes y otros ciudadanos). Al pasar a `Validado` (o cualquier estado posterior público) la foto es pública. Un reporte `Rechazado` responde `404` a quien no sea su autor o moderación (RN-09).
+
+### 4.9 `notificaciones` (HU-08.2)
+
+| Columna | Tipo | Nulo | Default | Restricciones / notas |
+|---------|------|------|---------|-----------------------|
+| `id` | `UUID` | No | `gen_random_uuid()` | PK (no enumerable). |
+| `usuario_id` | `UUID` | No | — | FK → `usuarios.id`. Dueño del aviso: la API filtra siempre por esta columna. |
+| `reporte_id` | `BIGINT` | No | — | FK → `reportes.id` (`RESTRICT`). |
+| `folio` | `VARCHAR(15)` | No | — | Folio público para navegar a `/reportes/:folio`. |
+| `mensaje` | `VARCHAR(800)` | No | — | Texto en español de México; no contiene datos de terceros. |
+| `leida` | `BOOLEAN` | No | `false` | |
+| `created_at` | `TIMESTAMPTZ` | No | `now()` | |
+
+Índice: `idx_notificaciones_usuario (usuario_id, leida, created_at DESC)`. Se crea una fila en la **misma transacción** que el cambio de estado hecho por moderación (si la transacción falla, no hay aviso). Quien hace el cambio no se notifica a sí mismo. Además, `reportes.idempotency_key UUID` (HU-08.4) con índice único parcial `uq_reportes_idempotencia (usuario_id, idempotency_key)`; nunca se expone en la API.
+
+### 4.10 Tablas de la Fase 3 (HU-05.3, HU-05.4, HU-05.5, HU-06.3, HU-01.4)
+
+| Tabla / columna | Definición | Reglas |
+|-----------------|------------|--------|
+| `reportes.reporte_principal_id` | `BIGINT NULL` FK → `reportes.id` | Sólo en el secundario de una fusión. `CHECK (reporte_principal_id <> id)`. |
+| `cuadrillas` | `id SERIAL`, `nombre`, `responsable`, `telefono_contacto`, `activa`, `created_at` | Nombre único sin distinguir mayúsculas (`uq_cuadrillas_nombre`). Teléfono `^[0-9 +()-]{7,20}$`. |
+| `asignaciones_cuadrilla` | `id`, `reporte_id`, `cuadrilla_id`, `fecha_programada`, `asignado_por_id`, `activa`, `created_at` | Historial: un reporte puede tener varias filas; **sólo una activa** (`uq_asignacion_activa` parcial). Reasignar desactiva la anterior. |
+| `usuario_cuadrillas` | PK compuesta (`usuario_id`, `cuadrilla_id`) | Sólo cuentas con rol `enlace_municipal` (validado en la API). |
+| `catalogo_tipos_dano` | `clave tipo_dano UNIQUE`, `nombre`, `descripcion`, `activo`, fechas | Gobierna disponibilidad y texto visible de los tres tipos soportados. |
+| `catalogo_motivos_rechazo` | `nombre` único sin mayúsculas, `descripcion`, `activo`, fechas | Nunca se borran: se desactivan. |
+| `usuario_colonias_favoritas` | PK compuesta (`usuario_id`, `colonia_id`) | Relación **N:M** usuario–colonia. Máx. 20 por persona. |
+
+`rol_usuario` incorpora el valor `enlace_municipal` (un valor de `ENUM` no se elimina en el *downgrade*).
+
 ---
 
 ## 5. Cómo el esquema garantiza las reglas de negocio
@@ -539,6 +584,21 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 | Buscar duplicados cercanos | ❌ 401 | ✅ | ✅ | ✅ |
 | Confirmar / "Sigue ahí" / "Ya no hay agua" (no sobre reporte propio) | ❌ 401 | ✅ | ✅ | ✅ |
 | Ver "Mis reportes" | ❌ 401 | ✅ | ✅ | ✅ |
+| Adjuntar hasta 3 fotos JPG/PNG (autor o quien confirmó el reporte) | ❌ 401 | ✅ | ✅ | ✅ |
+| Ver fotos de un reporte `Recibido` (autor, moderación y coordinación) | ❌ 403 | ❌ 403 (salvo autor) | ✅ | ✅ |
+| Mapa interactivo (`/reportes/mapa`) | ✅ | ✅ | ✅ | ✅ |
+| Exportar reportes a CSV / XML | ❌ 401 | ❌ 403 | ✅ | ✅ |
+| Importar catálogos desde XML | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Ver y marcar **mis** avisos (`/notificaciones`) | ❌ 401 | ✅ | ✅ | ✅ |
+| Leer avisos de otra persona | ❌ 401 | ❌ 404 | ❌ 404 | ❌ 404 |
+| Canal WebSocket de encharcamientos en vivo (datos públicos) | ✅ | ✅ | ✅ | ✅ |
+| Ver puntos recurrentes de inundación (`/indicadores/puntos-recurrentes`) | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Fusionar reportes duplicados (`/moderacion/reportes/fusionar`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
+| Rechazar con motivo **activo** del catálogo | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
+| Cuadrillas: crear, editar, desactivar, asignar y vincular enlaces | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Administrar catálogos de tipos de daño y motivos de rechazo | ❌ 401 | ❌ 403 | ❌ 403 | ✅ |
+| Mis colonias de interés (`/perfil/colonias-favoritas`) | ❌ 401 | ✅ | ✅ | ✅ |
+| Revisar mi trayecto y resumen público por colonia | ✅ | ✅ | ✅ | ✅ |
 | Cola de moderación (incluye `Rechazado`, `autor_id`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | `Recibido → Validado` / `Recibido → Rechazado` | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
 | `Activo → Rechazado` (encharcamiento) | ❌ 401 | ❌ 403 | ✅ | ❌ 403 |
@@ -565,3 +625,142 @@ Los roles **no son estrictamente jerárquicos** (p. ej. `coordinador` no valida 
 | A08 Integridad de datos | Historial append-only, triggers de inmutabilidad, folios del servidor. |
 | A09 Registro y alertas | Bitácora de transiciones, intentos de acceso `401/403/429` registrados **sin** contraseñas, tokens ni correos completos. |
 | A10 Manejo de condiciones excepcionales | Manejador global de excepciones que devuelve errores genéricos en español sin trazas; caída del proveedor de clima degradada a caché (`desactualizado: true`) o `503`. |
+
+---
+
+## 10. Requisitos opcionales · Fase 1 (HU-02.4, HU-04.5, HU-07.3 y puntos extra 4.3 / 4.4)
+
+### 10.1 Cartografía del mapa interactivo (HU-04.5 · extra 4.3)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Librería | **Leaflet 1.9** + **leaflet.markercluster** (agrupación en alta densidad), cargadas de forma diferida (`React.lazy`) sólo al abrir la vista de mapa. |
+| Proveedor de mosaicos | **OpenStreetMap** (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`). Es el único servicio externo que consulta el *navegador*: sólo recibe coordenadas de mosaico y la IP, nunca datos de reportes. Los datos de reportes salen exclusivamente de `GET /api/v1/reportes/mapa`. |
+| Atribución | «© colaboradores de OpenStreetMap», visible en el control de atribución del mapa (licencia ODbL). |
+| Límites y cuotas | La [política de uso de mosaicos de OSM](https://operations.osmfoundation.org/policies/tiles/) admite uso moderado y exige atribución; no es para tráfico masivo. Para producción de alto volumen se debe sustituir `TILES_URL` (`frontend/src/components/mapaUtils.ts`) por un proveedor con SLA (p. ej. MapTiler/Stadia) o un servidor de mosaicos propio. El mapa limita el zoom mínimo y el área a Ciudad Juárez (RN-01). |
+| Falla del proveedor | Tras 4 errores de mosaico consecutivos se avisa al usuario y se abre automáticamente la **lista accesible** con los mismos puntos; la vista «Lista» sigue disponible siempre. |
+| Permisos de geolocalización | **Nunca** se solicitan al cargar. Sólo al pulsar «Centrar en mi ubicación», tras mostrar un aviso de que la posición se usa únicamente para centrar el mapa en el dispositivo (no se envía ni se guarda). Si se niega el permiso o la posición está fuera de Juárez, el mapa sigue funcionando. |
+| Accesibilidad | Marcadores con **ícono + letra (B/A/E) + color**, `title`/`alt` descriptivos, foco por teclado (Enter abre el resumen), leyenda con texto y lista alternativa (`<details>`). |
+| Endpoint | `GET /api/v1/reportes/mapa` comparte **exactamente** los filtros de `GET /api/v1/reportes` (mismo `FiltrosReportes`), excluye `Rechazado` (RN-09), devuelve hasta 2000 puntos con `total`/`mostrados` y no incluye datos personales (RN-04). |
+
+### 10.2 Exportación CSV / XML (HU-07.3 · extra 4.4)
+
+* `GET /api/v1/reportes/exportar/csv` y `/xml`: sólo `moderador` y `coordinador`; respetan los mismos filtros de consulta; hasta 50 000 filas (cabeceras `X-Total-Registros` / `X-Registros-Exportados`).
+* **CSV**: UTF-8 **con BOM** (Excel respeta acentos y «ñ»); columnas `folio, tipo_dano, ubicacion, colonia, estado, fecha_creacion, fecha_actualizacion`. Las celdas que empiezan con `= + - @` se prefijan con `'` para evitar **inyección de fórmulas**.
+* **XML**: se arma con `lxml`, se **valida contra `docs/esquemas/reportes_v1.xsd` antes de entregarlo** (si no valida responde `500 XML_INVALIDO`), con espacio de nombres `https://callesseguras.juarez.mx/esquemas/reportes/v1`. Fechas ISO-8601 en `America/Ciudad_Juarez` (RN-02). Resultado vacío = documento válido con `total="0"`.
+* Ninguna exportación incluye nombres, correos, identificadores internos ni datos de la persona reportante (RN-04). `ubicacion` es la calle, no coordenadas.
+
+### 10.3 Importación XML de catálogos (extra 4.4)
+
+`POST /api/v1/admin/catalogos/importar-xml` (sólo `coordinador`, archivo ≤ 2 MB, `multipart/form-data`, campo `archivo`):
+
+1. Se analiza con un *parser* sin resolución de entidades ni red y se rechaza todo `DOCTYPE` (defensa contra **XXE** y *billion laughs*).
+2. Se valida contra `docs/esquemas/catalogos_v1.xsd` (rangos de Juárez incluidos, RN-01).
+3. **Integridad referencial**: cada colonia debe referenciar un `sector_clave` que exista en la base o se declare en el mismo XML; el código postal debe ser de Juárez; no se permiten colonias repetidas.
+4. Es **transaccional** (todo o nada) e **idempotente** (*upsert* por `clave` de sector y `(sector, nombre)` de colonia). Los errores son detallados, en español y con número de línea.
+
+### 10.4 Almacenamiento de fotografías (HU-02.4)
+
+`UPLOADS_DIR` (por defecto `uploads/`; en Docker `/srv/uploads`, montado como volumen nombrado `uploads` para sobrevivir al reinicio del contenedor). El tipo se determina por encabezado binario (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`), sin confiar en extensión ni `Content-Type`. El tope de 5 MB es exacto (5 MB se acepta, 5 MB + 1 byte se rechaza). Una foto inválida se rechaza con su motivo sin afectar al reporte ni a las demás fotos (`201` con `aceptadas`/`rechazadas`; `422` si ninguna es válida).
+
+---
+
+## 11. Requisitos opcionales · Fase 2 (HU-03.4, HU-08.2, HU-08.3, HU-08.4 y punto extra 4.5)
+
+### 11.1 Puntos recurrentes de inundación (HU-03.4)
+
+| Aspecto | Definición |
+|---------|------------|
+| Radio | **50 m** por Haversine (`distancia_haversine_m`, la misma función de la detección de duplicados). El límite es inclusivo (`<= 50`). |
+| Reportes que cuentan | Encharcamientos `Activo` e `Histórico`. Los `Rechazado` y el pavimento **no** cuentan. |
+| Año calendario | Del **1 de enero** al **día de hoy**, ambos en `America/Ciudad_Juarez`. Un reporte del 31 de diciembre del año anterior no cuenta; el año cambia a las 00:00 hora local, no UTC. |
+| Día distinto | Fecha **local** de `created_at` (`timezone('America/Ciudad_Juarez', created_at)::date`). Un reporte a las 23:30 locales y otro a las 00:30 locales son **2 días** aunque estén separados 1 hora; varios reportes el mismo día local son **1 día**. |
+| Umbral | `es_punto_recurrente = true` con **>= 3 días distintos**. Se exponen `dias_distintos_anio` y `ultima_ocurrencia` (sólo en encharcamientos; `null` en pavimento). |
+| Por reporte | La respuesta de lista y de detalle calcula la recurrencia centrada en **ese** reporte (consulta con prefiltro de caja envolvente e índice parcial `idx_reportes_enc_anio`). |
+| Vista de coordinación | `GET /api/v1/indicadores/puntos-recurrentes` agrupa los encharcamientos del año de forma voraz (el más reciente funge de centro; se absorben los que están a <= 50 m) y lista los grupos con >= 3 días, ordenados por días y luego por recencia. |
+
+### 11.2 Avisos sobre mis reportes (HU-08.2)
+
+* Disparo: dentro de `moderacion.transicionar` (misma transacción) para `Validado`, `Rechazado` (incluye el motivo), `Programado` (con fecha), `En reparación` y `Reparado` (con fecha). La fusión de duplicados (Fase 3) reutilizará `notificaciones.notificar`.
+* Aislamiento: toda consulta filtra por `usuario_id`; marcar como leído un aviso ajeno o inexistente devuelve **404** (misma respuesta, sin revelar existencia).
+* Frontend: campana en `SiteHeader` con contador (`aria` describe las no leídas), sondeo cada 60 s y al recuperar el foco.
+
+### 11.3 Tiempo real: WebSocket `/api/v1/ws/encharcamientos` (HU-08.3 · extra 4.5)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Origen de eventos | `crear`, `confirmar` («sigue ahí» / «ya no hay agua»), transiciones de moderación y el vencimiento automático a `Histórico` publican con `tiempo_real.emitir`, **después** del `commit`. Si nadie está conectado no se hace ninguna consulta. |
+| Mensajes | `hola` (al conectar, con el intervalo de latido), `ping`/`pong`, y `encharcamiento.creado\|actualizado\|retirado` con `event_id` (UUID), `folio`, `emitido_en` (hora local) y `reporte` (el mismo `ReporteResumenPublico` público; `null` en `retirado`). **Sin PII** (RN-04): nunca viajan autor, correo ni identificadores internos. |
+| Latido | El servidor envía `ping` cada 20 s; el cliente responde `pong`. Con dos silencios seguidos el servidor cierra (código 1001). El cliente reconecta si no ve latido en 2.5 intervalos. |
+| Deduplicación | Servidor: firma `tipo|folio|estado|vigente_hasta|ciclo` recordada (últimas 500) para no difundir el mismo cambio dos veces. Cliente: por `event_id` y por `folio` (un solo registro por reporte). |
+| Origen permitido | Si el navegador envía `Origin`, debe coincidir con `FRONTEND_URL` (si no, se cierra con 1008); misma política que CORS. |
+| Reconexión y respaldo | Reconexión exponencial 1 s → 15 s. Mientras el canal está caído se activa **sondeo HTTP cada 15 s** de `/reportes?tipo_dano=Encharcamiento&orden=recientes`; al reconectar se hace un sondeo único para recuperar lo perdido. Peor caso de aparición: 15 s de sondeo + latencia < **30 s**. |
+| Interfaz | Indicador `En vivo` / `Reconectando` / `Conectando` (ícono + texto). Los eventos se **fusionan** con la lista y el mapa: actualizan el folio existente, retiran rechazados o los que dejan de cumplir el filtro, insertan los nuevos que sí lo cumplen (sólo en la primera página) y **nunca** reinician ni borran los filtros activos. |
+| Escalado | El gestor de conexiones es **por proceso**. Con varias réplicas del backend se necesitaría un bus (p. ej. Redis Pub/Sub); con una réplica (Docker Compose y el manifiesto de Fase 4) es suficiente. |
+
+### 11.4 PWA y modo sin conexión (HU-08.4)
+
+* `manifest.webmanifest`: `name` «Calles Seguras Juárez», `short_name` «Calles Seguras», `start_url` `/`, `display` `standalone`, iconos 192×192 y 512×512 (+ maskable 512), colores de tema y fondo.
+* **Service Worker** (`/sw.js`, sólo en producción): *shell* de la app y `/assets/` (cache primero), navegación con red primero y respaldo a `index.html`, y **últimas consultas públicas** (`/reportes`, `/reportes/mapa`, `/reportes/{folio}`, máx. 30). **Nunca** cachea peticiones con `Authorization`, métodos distintos de `GET` ni rutas privadas. Al cerrar sesión la app borra `localStorage` de caché pública y manda `limpiar-caches` al SW.
+* **Vista sin conexión**: la consulta pública guarda su última respuesta (`csj.cache.*`, máx. 8) y, sin red, la muestra con el aviso «Sin conexión … última consulta guardada el *fecha y hora*» (hora de Ciudad Juárez). También se guarda el catálogo de colonias para poder crear borradores.
+* **Cola de envío** (`csj.cola.<usuario>`): un reporte creado sin conexión se guarda con `idempotency_key` (UUID). Al volver la red (evento `online`, al abrir la app y cada 30 s con pendientes) se envía en orden. El servidor **deduplica por `(usuario_id, idempotency_key)`**: reenviar devuelve el mismo folio (`200` en lugar de `201`) y no cuenta contra el límite de 10/hora. Estados visibles: `Sin conexión`, `Guardado para enviar`, `Enviando`, `No se pudo enviar`.
+* **Conflictos al reconectar**: `409 POSIBLE_DUPLICADO` → el borrador se conserva con los folios cercanos y las opciones «Enviar como daño distinto» o «Descartar»; `422` (territorio u otros) → se conserva con el motivo; `429` → se reintenta más tarde; `401` → se conserva hasta iniciar sesión. Un borrador **nunca se descarta solo**.
+* **Limitaciones documentadas**: las fotografías no se guardan sin conexión; la cola vive en el dispositivo de cada persona (se conserva tras cerrar sesión para no perder reportes y sólo se envía con la sesión de su dueño); `beforeinstallprompt` sólo existe en navegadores Chromium, por lo que el botón «Instalar app» aparece únicamente allí.
+
+---
+
+## 12. Requisitos opcionales · Fase 3 (HU-05.3, HU-05.4, HU-05.5, HU-06.3, HU-01.4, HU-04.6, HU-07.2)
+
+### 12.1 Quinto rol: `enlace_municipal` (HU-05.5)
+
+Cada cuenta sigue teniendo **un solo rol**. Matriz específica (`403` en todo lo no listado):
+
+| Acción | `enlace_municipal` |
+|--------|:------------------:|
+| `GET /enlace/reportes` y `GET /enlace/reportes/{folio}` de baches con **asignación activa** a una cuadrilla vinculada a su cuenta | ✅ |
+| `POST /enlace/reportes/{folio}/avance`: `Programado → En reparación` y `En reparación → Reparado` (fecha entre el reporte y hoy) | ✅ |
+| Baches o cuadrillas ajenas (exista o no el folio: misma respuesta) | ❌ 403 `REPORTE_AJENO` |
+| Cuenta suspendida (token válido de una cuenta desactivada) | ❌ 403 `CUENTA_SUSPENDIDA` |
+| Moderación, coordinación, catálogos, crear o confirmar reportes | ❌ 403 |
+
+El actor queda en `historial_estados` (usuario y fecha) con el motivo «Avance reportado por enlace municipal (cuadrilla …)», y el autor recibe su aviso (HU-08.2). La respuesta `CUENTA_SUSPENDIDA` aplica a todas las rutas protegidas: un token aún vigente de una cuenta desactivada recibe `403` en lugar de `401`.
+
+### 12.2 Fusión de duplicados (HU-05.3)
+
+* Alcance: **pavimento** del mismo tipo. Los encharcamientos no se fusionan (se confirman con «Sigue ahí» y vencen solos, RN-06).
+* El **secundario** debe estar en `Recibido` (la máquina de estados, también en el trigger de BD, sólo permite `Recibido → Rechazado`); el **principal** debe estar abierto. Mismo folio o principal rechazado/cerrado → `422`/`409`.
+* Transacción única con candado de fila ordenado por `id` (evita *deadlocks*); ante cualquier error, `rollback` total (probado inyectando una falla después de mover confirmaciones).
+* Confirmaciones: se suman al principal quienes confirmaron el secundario **y el autor del secundario**, excepto quien ya confirmó el principal y el autor del principal (el trigger le impide confirmar lo propio). Se insertan filas nuevas: las confirmaciones son *append-only*.
+* El secundario pasa a `Rechazado` con `motivo_rechazo = "Duplicado de <folio principal>"` (la BD exige ≥ 10 caracteres), conserva su folio y guarda `reporte_principal_id`. «Mis reportes» y el detalle de moderación muestran el enlace al principal.
+
+### 12.3 Cuadrillas (HU-05.4)
+
+* Asignar exige bache `Validado` (pasa a `Programado` con `fecha_programada >= hoy`) o reasignar uno `Programado`; cuadrilla activa. Queda en `historial_estados` el actor y el motivo «Asignado a la cuadrilla … para el …».
+* **Eliminar**: bloqueado (`409 CUADRILLA_CON_PENDIENTES`) si tiene baches `Programado`/`En reparación`; si tiene historial o enlaces, también `409` y se sugiere **desactivar** (trazabilidad). Sólo una cuadrilla sin uso se elimina.
+
+### 12.4 Catálogos administrables (HU-06.3)
+
+* **Motivos de rechazo**: CRUD sin borrado. Al rechazar, `motivo_id` (activo) es **obligatorio**; `motivo` es un detalle opcional. Se guarda el texto «Nombre: detalle» en el reporte y en el historial, por lo que editar o desactivar el motivo **no altera** rechazos anteriores.
+* **Tipos de daño**: el catálogo controla qué tipos se ofrecen y aceptan y su texto visible. Desactivar uno oculta la opción del formulario (`GET /catalogos/tipos-dano` sólo devuelve activos) y el servidor responde `422` a reportes nuevos de ese tipo; los existentes no cambian. **Limitación**: un tipo con comportamiento nuevo (otro formulario, severidad o vigencia) requiere código; por eso el alta sólo admite los tres tipos base que no estén ya registrados.
+
+### 12.5 Colonias de interés (HU-01.4)
+
+* Agregar sólo colonias activas (`422` si no); si después se desactivan, el registro se conserva y se muestra como «Colonia desactivada».
+* En `GET /reportes` con sesión, si la persona tiene colonias de interés y **no** filtra por `colonia_id` o `sector_id` (filtros excluyentes), el orden antepone sus colonias y cada elemento trae `en_tus_colonias`. El total y el resto de reportes no cambian. La interfaz agrupa «Tus colonias» y «Resto de la ciudad».
+
+### 12.6 Revisar mi trayecto (HU-04.6)
+
+| Aspecto | Decisión |
+|---------|----------|
+| Proveedor | **OSRM** (`ROUTING_API_URL`, perfil `driving`, `overview=full`, GeoJSON). El demo público `router.project-osrm.org` no tiene SLA ni cuota garantizada: para producción se debe usar un servidor OSRM propio. Sólo lo consulta el backend. |
+| Respaldo | Si OSRM falla, tarda más de `ROUTING_TIMEOUT_SECONDS` o no está configurado, se usa el **segmento directo** origen–destino y la respuesta lo marca (`fuente: "linea_recta"`, `degradado: true`, mensaje). |
+| Territorio | Origen y destino validados con RN-01 (`422 FUERA_DE_JUAREZ`). |
+| Distancia | Punto–polilínea por segmento con proyección equirectangular local (misma esfera que Haversine). Incluidos los encharcamientos `Activo` vigentes a **<= 100 m** (inclusivo). |
+| Orden | Primero `intransitable`, luego por distancia. Sin datos de la persona reportante. Vacío: «No hay encharcamientos reportados cerca del trayecto». |
+
+### 12.7 Resumen público por colonia (HU-07.2)
+
+* **Abiertos**: baches y alcantarillas en `Recibido` (público como «Sin validar», RN-09), `Validado`, `Programado` y `En reparación`. `Rechazado` nunca cuenta.
+* **Reparados**: total histórico con estado `Reparado`.
+* **Tiempo promedio de reparación**: promedio de días entre la fecha **local** del reporte y `fecha_reparacion` (RN-10), de todos los reparados de la colonia (histórico completo); `null` si aún no hay reparados.
+* También informa los encharcamientos vigentes. Una colonia sin reportes devuelve ceros; una inexistente, `404`.

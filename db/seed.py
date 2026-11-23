@@ -35,6 +35,11 @@ from app.core.database import SessionLocal  # noqa: E402
 from app.core.security import MENSAJE_CONTRASENA, contrasena_valida, hashear_contrasena  # noqa: E402
 from app.core.tiempo import a_local, ahora_utc  # noqa: E402
 from app.models import (  # noqa: E402
+    AsignacionCuadrilla,
+    CatalogoMotivoRechazo,
+    CatalogoTipoDano,
+    Cuadrilla,
+    UsuarioCuadrilla,
     CarrilAfectado,
     Colonia,
     ConfirmacionReporte,
@@ -264,6 +269,8 @@ def sembrar_usuarios(db) -> dict[str, list[Usuario]]:
         ("Coordinación Calles Seguras", "coordinador@ejemplo.mx", RolUsuario.COORDINADOR),
         ("Moderación Uno", "moderador@ejemplo.mx", RolUsuario.MODERADOR),
         ("Moderación Dos", "moderador2@ejemplo.mx", RolUsuario.MODERADOR),
+        # HU-05.5: cuenta de prueba del rol enlace municipal (vinculada a dos cuadrillas en sembrar_operacion).
+        ("Enlace Municipal de Prueba", "enlace@ejemplo.mx", RolUsuario.ENLACE_MUNICIPAL),
     ] + [
         (NOMBRES[i % len(NOMBRES)], f"ciudadano{i + 1:02d}@ejemplo.mx", RolUsuario.CIUDADANO) for i in range(12)
     ]
@@ -554,12 +561,87 @@ def sembrar_reportes(db, colonias: list[Colonia], por_rol: dict[str, list[Usuari
     log.info("Reportes sembrados: %s", ", ".join(f"{e.value}={n}" for e, n in por_estado))
 
 
+# --------------------------------------------------------------------------- Fase 3: catálogos y cuadrillas
+
+TIPOS_DANO_CATALOGO = [
+    (TipoDano.BACHE, "Bache", "Hoyo o hundimiento en el pavimento."),
+    (TipoDano.ALCANTARILLA, "Alcantarilla sin tapa", "Registro o pozo de visita sin tapa (severidad Alta fija)."),
+    (TipoDano.ENCHARCAMIENTO, "Encharcamiento", "Agua acumulada en la calle."),
+]
+MOTIVOS_RECHAZO = [
+    ("Duplicado", "Ya existe un reporte abierto del mismo daño (se usa al fusionar)."),
+    ("Fuera de la vía pública", "El daño está en propiedad privada o fuera de la calle."),
+    ("Información insuficiente", "La ubicación o la descripción no permiten identificar el daño."),
+    ("No corresponde a un daño", "Lo reportado no es un bache, alcantarilla sin tapa ni encharcamiento."),
+    ("Contenido inapropiado", "El reporte contiene lenguaje ofensivo o datos personales."),
+    ("Ya fue reparado", "Al revisar el punto, el daño ya estaba reparado."),
+    ("Fuera de Ciudad Juárez", "El punto no pertenece al municipio de Juárez."),
+]
+# Datos ficticios: no corresponden a cuadrillas ni teléfonos reales del municipio.
+CUADRILLAS = [
+    ("Cuadrilla Norte · Bacheo", "Jefatura de cuadrilla Norte", "656 000 0101"),
+    ("Cuadrilla Sur · Bacheo", "Jefatura de cuadrilla Sur", "656 000 0102"),
+    ("Cuadrilla Centro · Alcantarillas", "Jefatura de cuadrilla Centro", "656 000 0103"),
+]
+ASIGNACIONES_DE_EJEMPLO = 8
+
+
+def sembrar_operacion(db, por_rol: dict[str, list[Usuario]]) -> None:
+    """HU-06.3, HU-05.4 y HU-05.5. Idempotente: sólo agrega lo que falta y nunca pisa cambios de coordinación."""
+    for clave, nombre, descripcion in TIPOS_DANO_CATALOGO:
+        if db.scalar(select(CatalogoTipoDano.id).where(CatalogoTipoDano.clave == clave)) is None:
+            db.add(CatalogoTipoDano(clave=clave, nombre=nombre, descripcion=descripcion))
+    for nombre, descripcion in MOTIVOS_RECHAZO:
+        if db.scalar(select(CatalogoMotivoRechazo.id).where(func.lower(CatalogoMotivoRechazo.nombre) == nombre.lower())) is None:
+            db.add(CatalogoMotivoRechazo(nombre=nombre, descripcion=descripcion))
+    for nombre, responsable, telefono in CUADRILLAS:
+        if db.scalar(select(Cuadrilla.id).where(func.lower(Cuadrilla.nombre) == nombre.lower())) is None:
+            db.add(Cuadrilla(nombre=nombre, responsable=responsable, telefono_contacto=telefono))
+    db.commit()
+
+    cuadrillas = [db.scalar(select(Cuadrilla).where(func.lower(Cuadrilla.nombre) == n.lower())) for n, _, _ in CUADRILLAS]
+    enlaces = por_rol.get(RolUsuario.ENLACE_MUNICIPAL.value, [])
+    for enlace in enlaces:
+        for cuadrilla in cuadrillas[:2]:  # el enlace de prueba ve Norte y Sur, nunca Centro
+            if db.get(UsuarioCuadrilla, (enlace.id, cuadrilla.id)) is None:
+                db.add(UsuarioCuadrilla(usuario_id=enlace.id, cuadrilla_id=cuadrilla.id))
+    db.commit()
+
+    coordinador = (por_rol.get(RolUsuario.COORDINADOR.value) or [None])[0]
+    ya_hay = db.scalar(select(func.count()).select_from(AsignacionCuadrilla)) or 0
+    if coordinador is not None and ya_hay == 0:
+        pendientes = db.scalars(
+            select(Reporte)
+            .where(
+                Reporte.estado.in_([EstadoReporte.PROGRAMADO, EstadoReporte.EN_REPARACION]),
+                ~select(AsignacionCuadrilla.id).where(AsignacionCuadrilla.reporte_id == Reporte.id, AsignacionCuadrilla.activa).exists(),
+            )
+            .order_by(Reporte.id)
+            .limit(ASIGNACIONES_DE_EJEMPLO)
+        ).all()
+        for i, reporte in enumerate(pendientes):
+            fecha = reporte.fecha_programada or (a_local(reporte.created_at).date() + timedelta(days=3))
+            db.add(AsignacionCuadrilla(
+                reporte_id=reporte.id, cuadrilla_id=cuadrillas[i % 3].id,
+                fecha_programada=fecha, asignado_por_id=coordinador.id,
+            ))
+        db.commit()
+    log.info(
+        "Operación: %s tipos de daño, %s motivos de rechazo, %s cuadrillas, %s asignaciones",
+        db.scalar(select(func.count()).select_from(CatalogoTipoDano)),
+        db.scalar(select(func.count()).select_from(CatalogoMotivoRechazo)),
+        db.scalar(select(func.count()).select_from(Cuadrilla)),
+        db.scalar(select(func.count()).select_from(AsignacionCuadrilla)),
+    )
+
+
 def main() -> None:
     with SessionLocal() as db:
         por_rol = sembrar_usuarios(db)
         colonias = sembrar_territorio(db)
         sembrar_reportes(db, colonias, por_rol)
-    log.info("Semilla lista. Cuentas: coordinador@ejemplo.mx, moderador@ejemplo.mx, ciudadano01@ejemplo.mx…")
+        sembrar_operacion(db, por_rol)
+    log.info("Semilla lista. Cuentas: coordinador@ejemplo.mx, moderador@ejemplo.mx, enlace@ejemplo.mx, ciudadano01@ejemplo.mx…")
 
 
 if __name__ == "__main__":

@@ -56,6 +56,10 @@ class Reporte(Base):
     fecha_programada: Mapped[date | None] = mapped_column(Date)
     fecha_reparacion: Mapped[date | None] = mapped_column(Date)
     motivo_rechazo: Mapped[str | None] = mapped_column(String(500))
+    # HU-08.4: UUID del cliente para que reenviar un borrador offline nunca duplique el folio (RN-03).
+    idempotency_key: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # HU-05.3: en un reporte fusionado como duplicado, el reporte principal al que se unió.
+    reporte_principal_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("reportes.id", ondelete="RESTRICT"))
     forzado_como_nuevo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -6,6 +6,7 @@ from app.models import RolUsuario, TipoDano
 
 SISTEMA = "sistema"
 _M, _C = RolUsuario.MODERADOR.value, RolUsuario.COORDINADOR.value
+_E = RolUsuario.ENLACE_MUNICIPAL.value  # HU-05.5: sólo sobre baches de sus cuadrillas (se valida en el servicio)
 
 # (desde, hacia) -> roles que pueden ejecutarla.
 TRANSICIONES_PAVIMENTO: dict[tuple[E, E], frozenset[str]] = {
@@ -13,8 +14,8 @@ TRANSICIONES_PAVIMENTO: dict[tuple[E, E], frozenset[str]] = {
     (E.RECIBIDO, E.RECHAZADO): frozenset({_M}),
     (E.VALIDADO, E.PROGRAMADO): frozenset({_M, _C}),
     (E.VALIDADO, E.EN_REPARACION): frozenset({_M, _C}),
-    (E.PROGRAMADO, E.EN_REPARACION): frozenset({_M, _C}),
-    (E.EN_REPARACION, E.REPARADO): frozenset({_M, _C}),
+    (E.PROGRAMADO, E.EN_REPARACION): frozenset({_M, _C, _E}),
+    (E.EN_REPARACION, E.REPARADO): frozenset({_M, _C, _E}),
 }
 
 TRANSICIONES_ENCHARCAMIENTO: dict[tuple[E, E], frozenset[str]] = {

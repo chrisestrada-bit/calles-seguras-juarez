@@ -1359,3 +1359,153 @@ Con `GEOCODING_API_KEY`, el backend consulta `/reverse` de LocationIQ (`fuente: 
 | clima | GET | `/api/v1/clima/riesgo-inundacion` | visitante | 200 |
 | geocoding | GET | `/api/v1/geocoding/buscar` | visitante | 200 (incluye *fallback*) |
 | geocoding | GET | `/api/v1/geocoding/inversa` | visitante | 200 (incluye *fallback*) |
+
+---
+
+## 10. Extensiones opcionales · Fase 1
+
+> Todas las rutas están en `/api/v1`, documentadas en `/docs` (OpenAPI) y devuelven errores con la envoltura estándar (§1.4).
+
+### 10.1 `POST /api/v1/reportes/{folio}/fotos` (HU-02.4)
+
+`multipart/form-data` con el campo repetido `archivos` (hasta 3 imágenes **JPG/PNG**, ≤ 5 MB = `5 * 1024 * 1024` bytes cada una). Requiere sesión; sólo quien creó o confirmó el reporte.
+
+| Código | Cuándo |
+|--------|--------|
+| `201` | Al menos una foto válida. Cuerpo: `{ folio, aceptadas: [FotoOut], rechazadas: [{nombre, motivo}], mensaje }`. |
+| `401` | Sin sesión. |
+| `403` | La persona no creó ni confirmó el reporte. |
+| `404` | Folio inexistente (o `Rechazado` ajeno). |
+| `409` | Reporte `Rechazado` (propio): ya no admite fotos. |
+| `422` | Ninguna foto válida (`FOTOS_INVALIDAS`, un detalle por archivo: formato, tamaño, vacío o límite de 3). |
+
+`FotoOut`: `{ id, url, nombre_original, mime_type, tamano_bytes, created_at }` (sin datos de quien la subió).
+
+### 10.2 `GET /api/v1/reportes/{folio}/fotos` y `GET /api/v1/reportes/{folio}/fotos/{foto_id}`
+
+Lista de metadatos (`{ folio, maximo_por_persona, datos }`) y archivo binario (`image/jpeg` o `image/png`, `Cache-Control: private`). Con el reporte en `Recibido` sólo el autor, moderación y coordinación (`200`); visitantes y otros ciudadanos reciben `403 FOTO_NO_DISPONIBLE`. Desde `Validado` son públicas. `404` si el reporte está `Rechazado` (para quien no sea autor/moderación) o la foto no existe.
+
+### 10.3 `GET /api/v1/reportes/mapa` (HU-04.5)
+
+Acepta los **mismos parámetros que `GET /api/v1/reportes`** (`tipo_dano`, `estado`, `solo_vigentes`, `colonia_id`, `sector_id`, `calle`, `bbox`, `desde`, `hasta`, `orden`) sin paginación. Público.
+
+```json
+{
+  "total": 1240, "mostrados": 1240, "limite": 2000,
+  "datos": [{
+    "folio": "BCH-2026-000418", "tipo_dano": "Bache", "estado": "Recibido",
+    "etiqueta_publica": "Sin validar", "severidad": "Alta",
+    "ubicacion": { "latitud": 31.7201, "longitud": -106.4602 },
+    "calle": "Av. Tecnológico", "colonia": { "id": 3, "nombre": "Partido Escobedo" },
+    "nivel_agua": null, "created_at": "2026-11-22T09:15:00-07:00"
+  }]
+}
+```
+
+Nunca incluye `Rechazado` (`422` si se pide ese estado) ni datos de la persona reportante (RN-04, RN-09).
+
+### 10.4 `GET /api/v1/reportes/exportar/csv` · `GET /api/v1/reportes/exportar/xml` (HU-07.3)
+
+Roles `moderador` y `coordinador` (`401` sin sesión, `403` para ciudadanos). Mismos filtros que la consulta.
+
+* CSV: `text/csv; charset=utf-8` con BOM; columnas `folio, tipo_dano, ubicacion, colonia, estado, fecha_creacion, fecha_actualizacion`.
+* XML: `application/xml`, validado contra `docs/esquemas/reportes_v1.xsd` (`<reportes version total generado zona_horaria><reporte>…</reporte></reportes>`).
+* Cabeceras: `Content-Disposition: attachment`, `X-Total-Registros`, `X-Registros-Exportados` (tope 50 000).
+
+### 10.5 `POST /api/v1/admin/catalogos/importar-xml` (extra 4.4)
+
+Sólo `coordinador`. `multipart/form-data` con el campo `archivo` (XML ≤ 2 MB validado contra `docs/esquemas/catalogos_v1.xsd`).
+
+| Código | Cuándo |
+|--------|--------|
+| `200` | `{ sectores_creados, sectores_actualizados, colonias_creadas, colonias_actualizadas, mensaje }`. Idempotente. |
+| `401` / `403` | Sin sesión / rol distinto de coordinador. |
+| `413` | Archivo mayor de 2 MB. |
+| `422 XML_INVALIDO` | Vacío, mal formado, con `DOCTYPE`, fuera del XSD o con integridad referencial rota. `detalles[]` trae `linea`, `campo` y `mensaje`. No se importa nada. |
+
+---
+
+## 11. Extensiones opcionales · Fase 2
+
+### 11.1 Recurrencia en `ReporteResumenPublico` y `ReportePublico` (HU-03.4)
+
+Sólo en encharcamientos (en pavimento los tres campos son `null`):
+
+```json
+{ "es_punto_recurrente": true, "dias_distintos_anio": 4, "ultima_ocurrencia": "2026-11-20T18:05:00-07:00" }
+```
+
+### 11.2 `GET /api/v1/indicadores/puntos-recurrentes` (HU-03.4, sólo `coordinador`)
+
+`401` sin sesión, `403` para otros roles. Respuesta: `{ anio, radio_metros: 50, minimo_dias: 3, datos: [{ ubicacion, calle, colonia, dias_distintos_anio, total_reportes, ultima_ocurrencia, folios }] }`.
+
+### 11.3 Notificaciones (HU-08.2) · `GET /api/v1/notificaciones`, `PATCH /api/v1/notificaciones/{id}/leer`, `PATCH /api/v1/notificaciones/leer-todas`
+
+Todas requieren sesión (`401`) y operan **sólo sobre los avisos de quien las llama**.
+
+| Ruta | Respuesta |
+|------|-----------|
+| `GET /notificaciones?solo_no_leidas=&pagina=&por_pagina=` | `{ datos: [{ id, folio, mensaje, leida, created_at }], paginacion, no_leidas }` (más recientes primero). |
+| `PATCH /notificaciones/{id}/leer` | `200` con el aviso en `leida: true`; **`404`** si es de otra persona o no existe. |
+| `PATCH /notificaciones/leer-todas` | `{ marcadas, no_leidas: 0, mensaje }`. |
+
+### 11.4 WebSocket `GET /api/v1/ws/encharcamientos` (HU-08.3 · extra 4.5)
+
+Protocolo y garantías en `arquitectura.md` §11.3. Mensajes del servidor (JSON):
+
+```json
+{ "tipo": "hola", "heartbeat_segundos": 20 }
+{ "tipo": "ping" }
+{ "tipo": "encharcamiento.creado", "event_id": "7d0c…", "folio": "ENC-2026-000210", "emitido_en": "2026-11-22T17:02:11-07:00", "reporte": { "...ReporteResumenPublico..." } }
+{ "tipo": "encharcamiento.actualizado", "event_id": "…", "folio": "ENC-2026-000210", "emitido_en": "…", "reporte": { "...": "…" } }
+{ "tipo": "encharcamiento.retirado", "event_id": "…", "folio": "ENC-2026-000210", "emitido_en": "…", "reporte": null }
+```
+
+El cliente responde `{"tipo":"pong"}` a cada `ping`. Un `Origin` distinto de `FRONTEND_URL` se cierra con el código 1008. Los eventos no contienen autor, correo ni identificadores internos.
+
+### 11.5 `POST /api/v1/reportes` con `idempotency_key` (HU-08.4)
+
+Campo opcional `idempotency_key` (UUID) en el cuerpo de cualquiera de los tres tipos. Primera vez: `201`. Reenvío con la misma llave de la misma persona: **`200`** con el mismo reporte (mismo folio), sin crear otro ni consumir el límite de 10/hora. Llaves iguales de personas distintas no se relacionan. Una llave que no es UUID responde `422`. La llave nunca aparece en las respuestas.
+
+---
+
+## 12. Extensiones opcionales · Fase 3
+
+### 12.1 Cambio en `POST /api/v1/moderacion/reportes/{folio}/transiciones` (HU-06.3)
+
+Para `estado_nuevo: "Rechazado"` es obligatorio `motivo_id` (motivo **activo** de `GET /api/v1/catalogos/motivos-rechazo`); `motivo` pasa a ser un detalle opcional (máx. 300). Sin `motivo_id` → `422`; inactivo o inexistente → `422 MOTIVO_NO_AUTORIZADO`.
+
+### 12.2 `POST /api/v1/moderacion/reportes/fusionar` (HU-05.3 · moderador y coordinador)
+
+Cuerpo `{ "folio_principal": "BCH-2026-000418", "folio_secundario": "BCH-2026-000421" }`. Respuesta `200`: `{ folio_principal, folio_secundario, estado_secundario: "Rechazado", confirmaciones_transferidas, confirmaciones_principal, registrado_en, mensaje }`. Errores: `404` folio inexistente, `409 SECUNDARIO_NO_FUSIONABLE` / `PRINCIPAL_NO_VALIDO`, `422 FUSION_INVALIDA` (mismo folio, tipos distintos o encharcamientos). `MiReporte` y el detalle de moderación incluyen `folio_principal`.
+
+### 12.3 Cuadrillas (HU-05.4 · sólo coordinador)
+
+| Ruta | Descripción |
+|------|-------------|
+| `GET /cuadrillas?solo_activas=` · `POST /cuadrillas` | Lista (con `pendientes`) y alta `{ nombre, responsable, telefono_contacto }`. Nombre repetido → `409`. |
+| `GET /cuadrillas/{id}` | Detalle con `enlaces` y `baches` (activos e historial, sin datos del ciudadano). |
+| `PATCH /cuadrillas/{id}` | Editar o `{ "activa": false }`. |
+| `DELETE /cuadrillas/{id}` | `204`; `409 CUADRILLA_CON_PENDIENTES` o `409 CUADRILLA_CON_HISTORIAL`. |
+| `POST /cuadrillas/{id}/asignaciones` | `{ folio, fecha_programada }`: `Validado → Programado` (o reasignación). `409` si no está `Validado`/`Programado` o la cuadrilla está inactiva; `422` fecha pasada. |
+| `POST /cuadrillas/{id}/enlaces` · `DELETE /cuadrillas/{id}/enlaces/{usuario_id}` | Vincular/desvincular cuentas `enlace_municipal` (`422 ROL_INCOMPATIBLE` para otros roles). |
+
+### 12.4 Enlace municipal (HU-05.5 · sólo `enlace_municipal`)
+
+`GET /enlace/reportes?incluir_reparados=` → `{ cuadrillas, datos: [BacheAsignado] }`; `GET /enlace/reportes/{folio}`; `POST /enlace/reportes/{folio}/avance` con `{ estado_nuevo: "En reparación" | "Reparado", fecha_reparacion? }`. Ajenos → `403 REPORTE_AJENO`; cuenta suspendida → `403 CUENTA_SUSPENDIDA`; paso inválido → `400`; fecha inválida → `422`.
+
+### 12.5 Catálogos (HU-06.3)
+
+Públicos: `GET /catalogos/tipos-dano` (sólo activos, ahora con `nombre` y `descripcion`) y `GET /catalogos/motivos-rechazo` (activos). Coordinador: `GET|POST /admin/catalogos/tipos-dano`, `PATCH /admin/catalogos/tipos-dano/{id}`, `GET|POST /admin/catalogos/motivos-rechazo`, `PATCH /admin/catalogos/motivos-rechazo/{id}` (`{ nombre?, descripcion?, activo? }`). No hay `DELETE`.
+
+### 12.6 Colonias de interés (HU-01.4 · con sesión)
+
+`GET /perfil/colonias-favoritas` → `{ maximo: 20, datos: [{ colonia, sector, codigo_postal, activa, agregada_en }] }`; `POST` `{ colonia_id }` → `201` (o `200` si ya estaba; `422` si la colonia no está activa); `DELETE /perfil/colonias-favoritas/{colonia_id}` → `204` / `404`. En `GET /reportes` con sesión cada elemento puede traer `en_tus_colonias`.
+
+### 12.7 `GET /api/v1/trayecto/revisar` (HU-04.6 · público)
+
+Parámetros `origen_latitud`, `origen_longitud`, `destino_latitud`, `destino_longitud` (RN-01). Respuesta: `{ origen, destino, radio_metros: 100, ruta: { fuente: "osrm" | "linea_recta", degradado, mensaje, distancia_metros, duracion_segundos, puntos: [[lat, lon], …] }, total, datos: [{ folio, calle, colonia, ubicacion, nivel_agua, es_intransitable, hay_riesgo_personas_vehiculos, distancia_metros, vigente_hasta }], mensaje }`. Con `total = 0`, `mensaje` es «No hay encharcamientos reportados cerca del trayecto».
+
+### 12.8 `GET /api/v1/publico/colonias/{colonia_id}/resumen` (HU-07.2 · público)
+
+`{ colonia, sector, codigo_postal, activa, abiertos, abiertos_por_estado, reparados, tiempo_promedio_reparacion_dias, encharcamientos_activos, criterios, actualizado_en }`. `404` si la colonia no existe.
