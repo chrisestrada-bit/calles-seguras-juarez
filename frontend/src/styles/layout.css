@@ -5,14 +5,14 @@
 /* ——— Encabezado sticky de vidrio esmerilado ——— */
 .site-header {
   position: sticky; top: 0; z-index: 50;
-  background: rgb(243 245 249 / 0.72);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
-  backdrop-filter: blur(18px) saturate(1.6);
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 8px 24px -18px rgb(11 19 36 / 0.35);
+  box-shadow: 0 8px 24px -20px rgb(20 20 18 / 0.3);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .site-header { background: rgb(243 245 249 / 0.97); }
+  .site-header { background: var(--bg); }
 }
 .site-header__inner {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-6);
@@ -20,15 +20,13 @@
   min-height: var(--header-h);
 }
 
-.brand { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--ink); text-decoration: none; font-weight: 800; font-size: var(--text-lg); letter-spacing: -0.025em; margin-right: auto; }
+.brand { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--ink); text-decoration: none; font-weight: 700; font-size: var(--text-lg); letter-spacing: -0.02em; margin-right: auto; }
 .brand:hover { color: var(--ink); }
-.brand__mark { display: grid; border-radius: 10px; box-shadow: 0 1px 2px rgb(5 10 21 / 0.25), 0 6px 14px -6px rgb(19 39 125 / 0.55); transition: transform var(--dur-2) var(--ease-spring); }
-.brand:hover .brand__mark { transform: rotate(-6deg) scale(1.05); }
-.brand__route { fill: none; stroke-width: 2.6; stroke-linecap: round; }
-.brand__street { fill: none; stroke: rgb(200 211 234 / 0.35); stroke-width: 2; stroke-linecap: round; }
-.brand__node { fill: rgb(255 176 32 / 0.25); }
-.brand__node-core { fill: var(--signal); }
-.brand__text span { color: var(--route-700); }
+/* Logotipo oficial (public/brand): la variante a color cambia con el tema activo */
+.brand__mark { display: block; width: 2.375rem; height: 2.375rem; flex: none; transition: transform var(--dur-2) var(--ease-spring); }
+.brand:hover .brand__mark { transform: rotate(-4deg) scale(1.04); }
+.brand__text { white-space: nowrap; }
+.brand__text span { font-family: var(--font-serif); font-style: italic; font-weight: 500; font-size: 1.18em; letter-spacing: -0.01em; color: var(--route-700); }
 
 .menu-toggle {
   display: inline-flex; align-items: center; gap: var(--s-2);
@@ -56,7 +54,7 @@
 /* Píldora de hover que crece desde el centro */
 .nav-list a::before {
   content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
-  background: rgb(15 23 42 / 0.06);
+  background: rgb(20 20 18 / 0.06);
   opacity: 0; transform: scale(0.85);
   transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-2) var(--ease-out);
 }
@@ -69,7 +67,7 @@
 .nav-list a[aria-current="page"]::before { opacity: 1; transform: none; background: var(--surface); box-shadow: var(--shadow-1), inset 0 0 0 1px var(--border); animation: indicator-in var(--dur-3) var(--ease-spring) both; }
 .nav-list a[aria-current="page"]::after {
   content: ""; position: absolute; left: 50%; bottom: 0.3rem; width: 1.25rem; height: 3px; margin-left: -0.625rem; border-radius: 3px;
-  background: linear-gradient(90deg, var(--route-600), var(--water-400));
+  background: var(--route-700);
   animation: underline-in var(--dur-3) var(--ease-out) 120ms both;
 }
 @keyframes indicator-in { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: none; } }
@@ -79,8 +77,8 @@
 .session-user { display: inline-flex; align-items: center; gap: var(--s-2); margin-right: auto; }
 .session-user__avatar {
   display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%;
-  background: linear-gradient(140deg, var(--route-600), var(--night-700)); color: var(--ink-inverse); font-weight: 800;
-  box-shadow: 0 0 0 2px var(--surface), 0 4px 10px -4px rgb(19 39 125 / 0.6);
+  background: var(--night-800); color: var(--ink-inverse); font-weight: 700;
+  box-shadow: 0 0 0 2px var(--surface), 0 4px 10px -4px rgb(20 20 18 / 0.5);
 }
 .session-user__meta { display: grid; line-height: 1.2; }
 .session-user__name { font-weight: 700; font-size: var(--text-sm); max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -90,7 +88,7 @@
   .menu-toggle { display: none; }
   .site-header__menu, .site-header__menu.is-open { display: flex; flex-direction: row; align-items: center; flex-basis: auto; flex: 1; gap: var(--s-4); padding: 0; animation: none; }
   .site-header__menu nav { flex: 1; display: flex; justify-content: center; }
-  .nav-list { flex-direction: row; gap: var(--s-1); padding: 0.25rem; border-radius: var(--r-pill); background: rgb(15 23 42 / 0.04); box-shadow: inset 0 0 0 1px var(--border); }
+  .nav-list { flex-direction: row; gap: var(--s-1); padding: 0.25rem; border-radius: var(--r-pill); background: rgb(20 20 18 / 0.035); box-shadow: inset 0 0 0 1px var(--border); }
   .nav-list a { min-height: 2.375rem; padding: 0 var(--s-4); font-size: var(--text-sm); }
   .nav-list a[aria-current="page"]::after { bottom: 0.15rem; }
   .session-actions { padding-top: 0; border-top: 0; flex-wrap: nowrap; }
@@ -104,9 +102,9 @@
 .staff-bar__list::-webkit-scrollbar { display: none; }
 .staff-bar__label { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--ink-3); font-size: var(--text-xs); font-weight: 750; padding-right: var(--s-3); margin-right: var(--s-1); border-right: 1px solid var(--border-strong); white-space: nowrap; }
 .staff-bar a { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.25rem; padding: 0 var(--s-3); border-radius: var(--r-pill); color: var(--ink-2); text-decoration: none; font-size: var(--text-sm); font-weight: 650; white-space: nowrap; transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
-.staff-bar a:hover { background: rgb(15 23 42 / 0.06); color: var(--ink); }
-.staff-bar a[aria-current="page"] { background: var(--night-800); color: var(--ink-inverse); box-shadow: 0 6px 14px -8px rgb(5 10 21 / 0.8); }
-.staff-bar a[aria-current="page"] .icon { color: var(--signal); }
+.staff-bar a:hover { background: rgb(20 20 18 / 0.06); color: var(--ink); }
+.staff-bar a[aria-current="page"] { background: var(--night-800); color: var(--ink-inverse); box-shadow: 0 6px 14px -8px rgb(20 20 18 / 0.6); }
+.staff-bar a[aria-current="page"] .icon { color: var(--route-400); }
 
 /* ——— Widget de clima (HU-08.1) ——— */
 .rain-banner { max-width: var(--page-max); width: 100%; margin: 0 auto; padding: var(--s-3) var(--s-4) 0; }
@@ -120,7 +118,7 @@
   font-size: var(--text-sm);
   animation: fade-in var(--dur-3) var(--ease-out) both;
 }
-.rain-banner__icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: var(--r-md); flex: none; color: var(--ink-inverse); background: linear-gradient(150deg, var(--night-600), var(--night-900)); box-shadow: 0 6px 14px -8px rgb(5 10 21 / 0.7); overflow: hidden; }
+.rain-banner__icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: var(--r-md); flex: none; color: var(--plate-ink); background: var(--plate); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
 .rain-banner__body { flex: 1 1 14rem; display: grid; gap: 0.1rem; min-width: 0; }
 .rain-banner__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; font-weight: 750; color: var(--ink); }
 .rain-banner__meta { color: var(--ink-2); }
@@ -129,23 +127,23 @@
 .rain-banner__chip--ok { color: var(--success-700); background: var(--success-50); border-color: var(--success-200); }
 .rain-banner__chip--alert { color: var(--water-800); background: var(--water-50); border-color: var(--water-200); }
 .rain-banner__chip--stale { color: var(--pending-700); background: var(--pending-50); border-color: var(--pending-200); }
-.rain-banner__link { display: inline-flex; align-items: center; gap: var(--s-1); min-height: 2.5rem; padding: 0 var(--s-3); border-radius: var(--r-pill); background: var(--water-700); color: var(--ink-inverse); text-decoration: none; white-space: nowrap; font-weight: 700; transition: background-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out); }
-.rain-banner__link:hover { background: var(--water-800); color: var(--ink-inverse); }
+.rain-banner__link { display: inline-flex; align-items: center; gap: var(--s-1); min-height: 2.5rem; padding: 0 var(--s-3); border-radius: var(--r-pill); background: var(--water-700); color: var(--bg); text-decoration: none; white-space: nowrap; font-weight: 700; transition: background-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out); }
+.rain-banner__link:hover { background: var(--water-800); color: var(--bg); }
 .rain-banner__link:active { transform: scale(0.97); }
 .rain-banner__link .icon { transition: transform var(--dur-2) var(--ease-out); }
 .rain-banner__link:hover .icon { transform: translateX(3px); }
-.rain-banner--alert .rain-banner__inner { background: linear-gradient(100deg, rgb(227 246 251 / 0.92), rgb(255 255 255 / 0.8)); border-color: var(--water-200); }
-.rain-banner--alert .rain-banner__icon { background: linear-gradient(150deg, var(--water-500), var(--night-800)); }
+.rain-banner--alert .rain-banner__inner { background: linear-gradient(100deg, var(--water-50), var(--surface) 70%); border-color: var(--water-200); }
+.rain-banner--alert .rain-banner__icon { background: var(--water-50); color: var(--water-700); }
 .rain-banner--loading .rain-banner__inner, .rain-banner--error .rain-banner__inner { color: var(--ink-2); padding: var(--s-2) var(--s-4); }
 .rain-banner--error .icon { color: var(--ink-3); }
 
 /* Íconos climáticos animados */
 .wx { overflow: visible; }
-.wx-cloud { fill: #e7eeff; }
-.wx-cloud-back { fill: rgb(200 211 234 / 0.55); }
+.wx-cloud { fill: var(--plate-2); stroke: var(--plate-ink-3); stroke-width: 1; }
+.wx-cloud-back { fill: var(--plate-line); }
 .wx-drop { stroke: var(--water-400); stroke-width: 2; stroke-linecap: round; }
-.wx-sun-core { fill: var(--signal); }
-.wx-sun-rays { stroke: var(--signal); stroke-width: 2; stroke-linecap: round; transform-origin: 16px 16px; }
+.wx-sun-core { fill: var(--road-400); }
+.wx-sun-rays { stroke: var(--road-400); stroke-width: 2; stroke-linecap: round; transform-origin: 16px 16px; }
 @media (prefers-reduced-motion: no-preference) {
   .wx-drop { animation: wx-fall 1.1s linear infinite; }
   .wx-drop:nth-of-type(2) { animation-delay: 0.35s; }
@@ -183,26 +181,29 @@
 @media (min-width: 48em) { .section-heading h2 { font-size: var(--text-3xl); } }
 
 .back-link { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 2.5rem; margin: var(--s-2) 0 var(--s-2); padding: 0 var(--s-3) 0 var(--s-2); border-radius: var(--r-pill); text-decoration: none; color: var(--ink-2); font-size: var(--text-sm); transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out); }
-.back-link:hover { color: var(--ink); background: rgb(15 23 42 / 0.06); }
+.back-link:hover { color: var(--ink); background: rgb(20 20 18 / 0.06); }
 .back-link .icon { transition: transform var(--dur-2) var(--ease-out); }
 .back-link:hover .icon { transform: translateX(-3px); }
 
-/* ——— Pie nocturno ——— */
+/* ——— Pie editorial ——— */
 .site-footer {
   position: relative; overflow: hidden; isolation: isolate;
   margin-top: auto; padding: var(--s-12) var(--s-4) var(--s-8);
-  background: radial-gradient(70rem 24rem at 50% 0%, var(--night-700), var(--night-900) 70%);
-  color: var(--ink-inverse-2); font-size: var(--text-sm);
+  background: var(--bg-sunken); border-top: 3px double var(--border-strong);
+  color: var(--ink-2); font-size: var(--text-sm);
 }
 .site-footer__inner { position: relative; max-width: var(--page-max); margin: 0 auto; display: grid; gap: var(--s-4); justify-items: start; }
-.site-footer__brand { color: var(--ink-inverse); font-weight: 800; font-size: var(--text-lg); letter-spacing: -0.02em; }
-.site-footer__brand span { color: var(--signal); }
+.site-footer__brand { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--ink); font-weight: 700; font-size: var(--text-lg); letter-spacing: -0.02em; }
+.site-footer__brand span { font-family: var(--font-serif); font-style: italic; font-weight: 500; font-size: 1.15em; color: var(--route-700); }
+.site-footer__logo { width: 2.5rem; height: 2.5rem; flex: none; }
 .site-footer p { max-width: 52ch; }
-.site-footer__note { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--ink-inverse-3); }
-.site-footer__note .icon { color: var(--water-400); }
+.site-footer__note { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--ink-2); }
+.site-footer__note .icon { color: var(--route-700); }
+/* Sello de agua: variante tonal oficial, decorativa */
+.site-footer__sello { position: absolute; z-index: -1; right: -2rem; bottom: -4rem; width: clamp(11rem, 28vw, 19rem); height: auto; opacity: 0.12; pointer-events: none; }
 .site-footer__art { position: absolute; inset: auto 0 0 0; z-index: -1; width: 100%; height: 100%; opacity: 0.9; pointer-events: none; }
-.site-footer__art path { fill: none; stroke: var(--night-line); stroke-width: 1.5; }
-.site-footer__art .glow { stroke: rgb(110 168 255 / 0.35); stroke-width: 2; stroke-dasharray: 6 10; }
+.site-footer__art path { fill: none; stroke: var(--border); stroke-width: 1.5; }
+.site-footer__art .glow { stroke: rgb(var(--accent-rgb) / 0.3); stroke-width: 2; stroke-dasharray: 6 10; }
 @media (prefers-reduced-motion: no-preference) { .site-footer__art .glow { animation: route-flow 6s linear infinite; } }
 @keyframes route-flow { to { stroke-dashoffset: -160; } }
 
@@ -241,8 +242,8 @@
 .theme-toggle:focus-visible { border-radius: 50%; }
 .theme-toggle__icons { position: relative; display: grid; width: 20px; height: 20px; }
 .theme-toggle__icons .icon { grid-area: 1 / 1; transition: transform var(--dur-3) var(--ease-out), opacity var(--dur-2) var(--ease-out); }
-.theme-toggle__moon { color: var(--route-700); }
-.theme-toggle__sun { color: var(--signal); opacity: 0; transform: rotate(-90deg) scale(0.5); }
+.theme-toggle__moon { color: var(--ink); }
+.theme-toggle__sun { color: var(--route-700); opacity: 0; transform: rotate(-90deg) scale(0.5); }
 .theme-toggle.is-dark .theme-toggle__moon { opacity: 0; transform: rotate(90deg) scale(0.5); }
 .theme-toggle.is-dark .theme-toggle__sun { opacity: 1; transform: none; }
 @media (min-width: 64em) {
@@ -254,3 +255,27 @@
   .menu-toggle { width: 2.75rem; padding: 0; justify-content: center; }
   .menu-toggle span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 }
+
+/* ——— Splash de bienvenida (~900 ms, omitible; no se monta con movimiento reducido) ——— */
+.splash {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: radial-gradient(40rem 30rem at 50% 40%, rgb(var(--accent-rgb) / 0.08), transparent 70%), var(--bg);
+  animation: splash-in 360ms var(--ease-out) both;
+  transition: opacity 280ms var(--ease-out), visibility 0s linear 280ms;
+}
+.splash.is-leaving { opacity: 0; visibility: hidden; }
+.splash__marca { display: grid; justify-items: center; gap: var(--s-4); }
+.splash__logo { width: 7rem; height: 7rem; animation: splash-logo 900ms var(--ease-spring) both; }
+.splash__nombre { color: var(--ink); font-weight: 700; font-size: var(--text-xl); letter-spacing: -0.02em; animation: rise-in 600ms var(--ease-out) 120ms both; }
+.splash__nombre span { font-family: var(--font-serif); font-style: italic; font-weight: 500; font-size: 1.15em; color: var(--route-700); }
+.splash__barra { position: relative; display: block; width: 7.5rem; height: 2px; border-radius: 2px; background: var(--border-strong); overflow: hidden; }
+.splash__barra::after { content: ""; position: absolute; inset: 0; background: var(--route-700); transform-origin: left; animation: splash-barra 900ms var(--ease-out) both; }
+.splash__omitir {
+  position: absolute; right: var(--s-4); bottom: var(--s-4);
+  min-height: 2.75rem; padding: 0 var(--s-4); border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink); font-weight: 650; font-size: var(--text-sm);
+}
+.splash__omitir:hover { border-color: var(--ink); }
+@keyframes splash-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes splash-logo { from { opacity: 0; transform: scale(0.86) rotate(-8deg); } to { opacity: 1; transform: none; } }
+@keyframes splash-barra { from { transform: scaleX(0); } to { transform: scaleX(1); } }

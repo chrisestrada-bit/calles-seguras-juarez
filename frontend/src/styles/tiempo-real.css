@@ -61,3 +61,4 @@
 [data-theme="dark"] .bell__item.is-unread { background: var(--surface-3); }
 @media (prefers-reduced-motion: reduce) { .live-status--en_vivo .live-status__dot { animation: none; } }
 @media (max-width: 480px) { .live-status__hint { display: none; } }
+[data-theme="dark"] .bell__count { color: #0d1015; }

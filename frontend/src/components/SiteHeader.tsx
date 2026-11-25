@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { Icon, type IconName } from './Icon';
 import { ThemeToggle } from './ThemeToggle';
+import { Logo } from './Logo';
 import { CampanaNotificaciones } from './CampanaNotificaciones';
 import { InstalarApp } from './InstalarApp';
 
@@ -18,19 +19,8 @@ function actual(href: string) {
 function Marca() {
   return (
     <a className="brand" href="/" aria-label="Calles Seguras Juárez, inicio">
-      <span className="brand__mark" aria-hidden="true">
-        <svg width="36" height="36" viewBox="0 0 36 36" focusable="false">
-          <defs>
-            <linearGradient id="brand-noche" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1c2f63" /><stop offset="1" stopColor="#070d1a" /></linearGradient>
-            <linearGradient id="brand-ruta" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#7d95ff" /><stop offset="1" stopColor="#22c4e6" /></linearGradient>
-          </defs>
-          <rect width="36" height="36" rx="10" fill="url(#brand-noche)" />
-          <path d="M4 26c6-1 9-6 14-7s9 2 14-3" className="brand__route" stroke="url(#brand-ruta)" />
-          <path d="M9 4c1 8 6 11 9 15s3 9 2 13" className="brand__street" />
-          <circle cx="18" cy="19" r="4.2" className="brand__node" />
-          <circle cx="18" cy="19" r="1.6" className="brand__node-core" />
-        </svg>
-      </span>
+      {/* Logotipo oficial a color: cambia con el tema (claro / Grafito turquesa) */}
+      <Logo variante="color" size={38} className="brand__mark" />
       <span className="brand__text">Calles Seguras <span>Juárez</span></span>
     </a>
   );

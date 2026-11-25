@@ -1,8 +1,8 @@
-import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError, descargarArchivo } from '../services/api';
 import { useAuth } from '../context/useAuth';
 import { agruparPorSector, cargarColonias, etiquetaColonia } from '../services/catalogos';
-import { useCargaDatos } from '../hooks/useCargaDatos';
+import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import { useEncharcamientosEnVivo } from '../hooks/useEncharcamientosEnVivo';
 import { guardarConsulta, leerConsulta, useEnLinea } from '../services/offline';
 import { fusionarEnVivo, PATRON_FOLIO, SIN_FILTROS, type FiltrosLista as Filtros } from '../utils/enVivo';
@@ -12,7 +12,10 @@ import { ZoneSection } from '../components/ZoneSection';
 import { Pagination } from '../components/AdminShared';
 import { Icon } from '../components/Icon';
 import { EmptyState, ReportGridSkeleton, TypeGlyph } from '../components/ui';
-import { HeroMap } from '../components/HeroMap';
+import { AlertaPrioritaria } from '../components/AlertaPrioritaria';
+import { TableroPortada } from '../components/TableroPortada';
+import { EncharcamientosVigentes } from '../components/EncharcamientosVigentes';
+import { vigentesOrdenados } from '../utils/vigencia';
 import type { ReporteResumenPublico, ReportePublico, RespuestaPaginada, TipoDano, EstadoReporte } from '../types/api';
 
 const MapaReportes = lazy(() => import('../components/MapaReportes').then((m) => ({ default: m.MapaReportes })));
@@ -74,6 +77,10 @@ async function consultar(clave: string): Promise<RespuestaPaginada<ReporteResume
 
 const cargarCatalogo = () => cargarColonias();
 
+/** HU-03.2: encharcamientos activos para la portada (se mezclan con los eventos en vivo de HU-08.3). */
+const RUTA_VIGENTES = '/api/v1/reportes?tipo_dano=Encharcamiento&estado=Activo&por_pagina=50&orden=recientes';
+const FILTRO_VIGENTES: Filtros = { ...SIN_FILTROS, tipo: 'Encharcamiento', estado: 'Activo' };
+
 export function PublicHomePage() {
   // /?colonia=ID (enlace desde /resumen-colonia) abre la consulta ya filtrada.
   const coloniaUrl = new URLSearchParams(window.location.search).get('colonia') ?? '';
@@ -83,7 +90,7 @@ export function PublicHomePage() {
   const [vista, setVista] = useState<'lista' | 'mapa'>('lista');
   const [exportando, setExportando] = useState<'csv' | 'xml' | null>(null);
   const [errorExportar, setErrorExportar] = useState('');
-  const { usuario } = useAuth();
+  const { usuario, autenticado } = useAuth();
   const puedeExportar = usuario?.rol === 'moderador' || usuario?.rol === 'coordinador';
   const { reconexiones } = useEnLinea();
   const enVivo = useEncharcamientosEnVivo(true);
@@ -97,6 +104,13 @@ export function PublicHomePage() {
   const error = consulta.estado === 'error' ? consulta.error : '';
   const hayFiltros = Object.values(aplicados).some((valor) => valor.trim() !== '');
   const hayBorrador = Object.values(borrador).some((valor) => valor.trim() !== '');
+  // Portada: reporte seleccionado (mapa ↔ encharcamientos), reloj para la vigencia de 6 h y encharcamientos vigentes.
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => { const reloj = window.setInterval(() => setAhora(Date.now()), 60_000); return () => window.clearInterval(reloj); }, []);
+  const encharcamientos = useCargaDatos<RespuestaPaginada<ReporteResumenPublico>>(`${RUTA_VIGENTES}#${reconexiones}`, obtenerJson, 'No fue posible cargar los encharcamientos vigentes.');
+  const vigentes = useMemo(() => vigentesOrdenados(fusionarEnVivo(encharcamientos.datos?.datos ?? [], enVivo.vivos, FILTRO_VIGENTES, true), ahora), [encharcamientos.datos, enVivo.vivos, ahora]);
+  const estadoVigentes = encharcamientos.estado === 'error' ? 'error' : encharcamientos.estado === 'listo' ? 'listo' : 'cargando';
 
   const aplicar = (siguientes: Filtros) => { setAplicados(siguientes); setPagina(1); };
   /** Listas y fechas filtran al cambiar (con la calle escrita); la calle o el folio, al pulsar «Buscar». */
@@ -111,28 +125,38 @@ export function PublicHomePage() {
     finally { setExportando(null); }
   };
   const buscar = (evento: FormEvent) => { evento.preventDefault(); aplicar(borrador); };
+  /** Buscador de la portada: aplica la misma búsqueda de calle/folio (HU-04.2) y lleva a los resultados. */
+  const consultarCalle = (evento: FormEvent) => {
+    evento.preventDefault();
+    aplicar(borrador);
+    document.getElementById('reportes-titulo')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
   const limpiar = () => { setBorrador(SIN_FILTROS); aplicar(SIN_FILTROS); };
 
   return (
     <main className="public-page">
-      <section className="hero" aria-labelledby="hero-titulo">
-        <HeroMap />
-        <div className="hero__content">
-          <h1 id="hero-titulo" className="reveal">Consulta y reporta el estado de tus calles</h1>
-          <p className="hero__lead reveal reveal--2">Encuentra baches y encharcamientos antes de salir. La información pública nunca muestra datos del autor.</p>
-          <p className="hero__place reveal reveal--3"><span className="hero__live" aria-hidden="true" />Ciudad Juárez, Chihuahua</p>
-          <div className="hero__actions reveal reveal--4">
-            <a className="button button--accent button--lg" href="#zona-titulo"><Icon name="locate" size={20} />Revisar mi zona</a>
-            <a className="button button--ghost-light button--lg" href="/reportar"><Icon name="plus" size={20} />Reportar un daño</a>
-          </div>
+      <section className="portada" aria-labelledby="portada-titulo">
+        <div className="portada__texto">
+          <h1 id="portada-titulo" className="reveal">Antes de salir, <em>lee la calle.</em></h1>
+          <p className="portada__entrada reveal reveal--2">Baches, alcantarillas sin tapa y encharcamientos reportados por vecinos de Ciudad Juárez, con su estado de reparación al minuto. Nunca mostramos datos de quien reporta.</p>
+
+          <form className="consulta-calle reveal reveal--3" role="search" onSubmit={consultarCalle}>
+            <label htmlFor="consulta-calle">¿Por qué calle vas a circular?</label>
+            <div className="consulta-calle__campo">
+              <Icon name="search" size={20} />
+              <input id="consulta-calle" placeholder="Calle o folio, ej. Tecnológico" value={borrador.busqueda} onChange={(e) => cambiar('busqueda', e.target.value)} aria-describedby="consulta-calle-ayuda" autoComplete="off" />
+              <button className="button" type="submit">Consultar</button>
+            </div>
+            <p id="consulta-calle-ayuda" className="consulta-calle__ayuda">Escribe al menos 3 letras de la calle o el folio completo.</p>
+          </form>
+
+          <AlertaPrioritaria vigentes={vigentes} estado={estadoVigentes} ahora={ahora} onSeleccionar={setSeleccionado} />
         </div>
-        <p className="hero__map-note">Mapa ilustrativo de Ciudad Juárez</p>
-        <ul className="hero__legend reveal reveal--4" aria-label="Qué puedes reportar">
-          <li className="hero__chip hero__chip--road"><TypeGlyph tipo="Bache" size={20} />Bache</li>
-          <li className="hero__chip hero__chip--manhole"><TypeGlyph tipo="Alcantarilla sin tapa" size={20} />Alcantarilla sin tapa</li>
-          <li className="hero__chip hero__chip--water"><TypeGlyph tipo="Encharcamiento" size={20} />Encharcamiento</li>
-        </ul>
+
+        <TableroPortada filtros={paramsFiltros(aplicados).toString()} filtrosLista={aplicados} vivos={enVivo.vivos} seleccionado={seleccionado} onSeleccionar={setSeleccionado} />
       </section>
+
+      <EncharcamientosVigentes vigentes={vigentes} estado={estadoVigentes} error={encharcamientos.error} autenticado={autenticado} ahora={ahora} seleccionado={seleccionado} onSeleccionar={setSeleccionado} />
 
       <ZoneSection />
 

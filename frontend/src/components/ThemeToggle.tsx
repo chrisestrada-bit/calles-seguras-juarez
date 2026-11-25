@@ -1,62 +1,37 @@
-import { useEffect, useState } from 'react';
+import { CLAVE_TEMA, COLOR_BARRA, useTema, type Tema } from '../hooks/useTema';
 import { Icon } from './Icon';
 
-type Tema = 'light' | 'dark';
-const CLAVE = 'csj-theme';
-const COLOR_BARRA: Record<Tema, string> = { light: '#f3f5f9', dark: '#0b1120' };
-
-/** El script de index.html ya fijó data-theme antes del primer pintado; aquí sólo lo leemos. */
-const temaActual = (): Tema => (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
-
-function aplicarTema(tema: Tema, animar: boolean) {
+/** El script public/tema-inicial.js ya fijó data-theme antes del primer pintado; aquí sólo se alterna. */
+function aplicarTema(tema: Tema) {
   const raiz = document.documentElement;
-  if (animar) {
-    raiz.classList.add('theme-switching');
-    window.setTimeout(() => raiz.classList.remove('theme-switching'), 320);
-  }
+  raiz.classList.add('theme-switching');
+  window.setTimeout(() => raiz.classList.remove('theme-switching'), 320);
   raiz.setAttribute('data-theme', tema);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', COLOR_BARRA[tema]);
 }
 
-const preferenciaGuardada = (): Tema | null => {
-  try {
-    const valor = localStorage.getItem(CLAVE);
-    return valor === 'dark' || valor === 'light' ? valor : null;
-  } catch { return null; }
-};
-
+/**
+ * Interruptor accesible entre Claro editorial (por defecto) y Grafito turquesa.
+ * La preferencia se guarda en localStorage; sin preferencia la app arranca en claro.
+ */
 export function ThemeToggle() {
-  const [tema, setTema] = useState<Tema>(temaActual);
-
-  // Sin preferencia guardada, seguir los cambios del sistema operativo.
-  useEffect(() => {
-    const consulta = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!consulta) return;
-    const alCambiar = (e: MediaQueryListEvent) => {
-      if (preferenciaGuardada()) return;
-      const siguiente: Tema = e.matches ? 'dark' : 'light';
-      aplicarTema(siguiente, true);
-      setTema(siguiente);
-    };
-    consulta.addEventListener('change', alCambiar);
-    return () => consulta.removeEventListener('change', alCambiar);
-  }, []);
+  const oscuro = useTema() === 'dark';
 
   const alternar = () => {
-    const siguiente: Tema = tema === 'dark' ? 'light' : 'dark';
-    aplicarTema(siguiente, true);
-    try { localStorage.setItem(CLAVE, siguiente); } catch { /* almacenamiento no disponible: el cambio aplica sólo a esta visita */ }
-    setTema(siguiente);
+    const siguiente: Tema = oscuro ? 'light' : 'dark';
+    aplicarTema(siguiente);
+    try { localStorage.setItem(CLAVE_TEMA, siguiente); } catch { /* almacenamiento no disponible: el cambio aplica sólo a esta visita */ }
   };
 
-  const oscuro = tema === 'dark';
   return (
     <button
       className={`theme-toggle${oscuro ? ' is-dark' : ''}`}
       type="button"
+      role="switch"
+      aria-checked={oscuro}
       onClick={alternar}
-      aria-label={oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-      title={oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      aria-label="Tema oscuro Grafito turquesa"
+      title={oscuro ? 'Cambiar a Claro editorial' : 'Cambiar a Grafito turquesa (oscuro)'}
     >
       <span className="theme-toggle__icons" aria-hidden="true">
         <Icon name="moon" size={20} className="theme-toggle__moon" />

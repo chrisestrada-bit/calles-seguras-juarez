@@ -47,20 +47,25 @@
 .map-list ul { display: grid; gap: var(--s-1); max-height: 20rem; overflow: auto; margin: 0; padding: 0 var(--s-4) var(--s-4); list-style: none; }
 .link-button { padding: 0; border: 0; background: none; color: var(--route-700); font: inherit; text-decoration: underline; cursor: pointer; }
 
-/* Marcadores: ícono + letra + color (texto blanco sobre los tonos 700: contraste >= 4.5:1). */
+/* Marcadores: ícono + letra + color. Texto claro sobre los tonos 700 en modo claro y obsidiana sobre los tonos claros en oscuro (contraste >= 4.5:1). */
 .map-pin-wrap { background: none; border: 0; }
-.map-pin { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 44px; height: 30px; border-radius: 999px; border: 2px solid #fff; color: #fff; font-size: 12px; box-shadow: 0 2px 6px rgb(5 10 21 / 0.45); }
+.map-pin { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 44px; height: 30px; border-radius: 999px; border: 2px solid var(--surface); color: var(--pin-ink, #fff); font-size: 12px; box-shadow: 0 2px 6px rgb(20 20 18 / 0.45); }
 .map-pin b { font-weight: 800; line-height: 1; }
 .map-pin--road { background: var(--road-700); }
 .map-pin--manhole { background: var(--manhole-700); }
 .map-pin--water { background: var(--water-700); }
-.map-pin.is-selected { outline: 3px solid var(--signal); outline-offset: 2px; transform: scale(1.12); }
-.leaflet-marker-icon:focus-visible .map-pin { outline: 3px solid var(--signal); outline-offset: 2px; }
+.map-pin.is-selected { outline: 3px solid var(--route-700); outline-offset: 2px; transform: scale(1.12); }
+.leaflet-marker-icon:focus-visible .map-pin { outline: 3px solid var(--route-700); outline-offset: 2px; }
 .report-map .leaflet-control-attribution { font-size: 11px; }
 
 @media (min-width: 900px) {
   .map-layout { grid-template-columns: minmax(0, 1fr) 20rem; }
 }
 
-[data-theme="dark"] .report-map .leaflet-tile-pane { filter: brightness(0.8) contrast(1.05); }
+[data-theme="dark"] .report-map { --pin-ink: #0d1015; }
+[data-theme="dark"] .report-map .leaflet-tile-pane { filter: brightness(0.62) contrast(1.15) saturate(0.55); }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } .map-pin.is-selected { transform: none; } }
+
+/* Grupos de marcadores (markercluster) con la identidad: acento del tema y cifra en monoespaciada */
+.marker-cluster, .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-color: rgb(var(--accent-rgb) / 0.25) !important; }
+.marker-cluster div { background-color: var(--route-700) !important; color: var(--bg); font-family: var(--font-mono); font-weight: 500; }

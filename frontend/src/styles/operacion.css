@@ -5,7 +5,7 @@
 
 /* ——— Modal de confirmación (HU-05.3) ——— */
 .modal { width: min(32rem, calc(100vw - 2rem)); padding: var(--s-5); border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-3, 0 24px 48px rgb(5 10 21 / 0.35)); }
-.modal::backdrop { background: rgb(5 10 21 / 0.55); }
+.modal::backdrop { background: rgb(20 20 18 / 0.55); }
 .modal h2 { margin-top: 0; font-size: var(--text-lg); }
 .modal form, .modal > div { display: grid; gap: var(--s-3); }
 .modal__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
