@@ -30,7 +30,7 @@
 .consulta-calle__campo input { flex: 1; inline-size: 0; min-width: 0; min-height: 2.5rem; padding: 0; border: 0; background: none; box-shadow: none; font-size: var(--text-lg); }
 .consulta-calle__campo input:focus-visible { outline: none; box-shadow: none; }
 /* El campo vive dentro de la píldora: sin el fondo propio que los temas dan a los inputs */
-[data-theme] .consulta-calle__campo input { background: transparent; box-shadow: none; }
+[data-theme] .consulta-calle__campo input, [data-theme] .consulta-calle__campo input:focus-visible { background: transparent; box-shadow: none; border: 0; outline: none; }
 .consulta-calle__campo .button { flex: none; }
 .consulta-calle__ayuda { font-size: var(--text-sm); color: var(--ink-3); }
 .consulta-calle__ayuda a { white-space: nowrap; }
@@ -187,3 +187,40 @@
   .alerta__datos dd { font-size: var(--text-md); }
   .kpis dd { font-size: 1.5rem; }
 }
+
+/* Error de carga con reintento (la sección nunca queda vacía ni muda) */
+.agua-vigente__error {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--s-3) var(--s-4);
+  padding: var(--s-4) var(--s-5); border: 1px solid var(--danger-200); border-radius: var(--r-lg);
+  background: var(--danger-50); color: var(--danger-800);
+}
+.agua-vigente__error > div { flex: 1 1 16rem; display: grid; gap: var(--s-1); }
+.agua-vigente__error p { color: var(--ink-2); }
+.agua-vigente__error .icon { color: var(--danger-700); margin-top: 0.1rem; }
+/* Los votos sin sesión son enlaces con la misma forma que los botones */
+a.agua-voto { text-decoration: none; color: var(--ink); }
+a.agua-voto:hover { color: var(--ink); }
+.agua-votos { align-items: center; }
+
+/* ——— Sugerencias del buscador (combobox) ——— */
+.consulta-calle__caja { position: relative; }
+.sugerencias {
+  position: absolute; z-index: 1100; left: 0; right: 0; top: calc(100% + 0.4rem);
+  max-height: min(22rem, 60vh); overflow-y: auto; margin: 0; padding: var(--s-1); list-style: none;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-3);
+}
+.sugerencias[hidden] { display: none; }
+.sugerencia { cursor: pointer; border-radius: var(--r-sm); }
+.sugerencia__grupo { display: block; padding: var(--s-2) var(--s-3) var(--s-1); font-size: var(--text-xs); font-weight: 750; color: var(--ink-3); cursor: default; }
+.sugerencia__fila { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); min-height: 2.75rem; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); }
+.sugerencia__fila .icon { color: var(--route-700); }
+.sugerencia__texto { font-weight: 650; overflow-wrap: anywhere; }
+.sugerencia__detalle { font-size: var(--text-xs); color: var(--ink-3); text-align: right; }
+.sugerencia.is-activa .sugerencia__fila, .sugerencia:hover .sugerencia__fila { background: var(--route-50); color: var(--ink); }
+.sugerencia.is-activa .sugerencia__fila { box-shadow: inset 0 0 0 2px var(--route-700); }
+@media (max-width: 29.99em) { .sugerencia__fila { grid-template-columns: auto minmax(0, 1fr); } .sugerencia__detalle { grid-column: 2; text-align: left; } }
+
+/* Estado vacío: colonias que coinciden con lo buscado */
+.sugerencias-vacio { display: grid; justify-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
+.sugerencias-vacio p { font-weight: 650; color: var(--ink); }
+.sugerencias-vacio ul { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
