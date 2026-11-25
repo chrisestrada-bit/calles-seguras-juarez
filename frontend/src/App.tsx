@@ -3,6 +3,7 @@ import { SiteHeader } from './components/SiteHeader';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
 import { Splash } from './components/Splash';
+import { SeccionInstalacion } from './components/InstalarApp';
 import { RainBanner } from './components/RainBanner';
 import { BannerRed } from './components/BannerRed';
 import { PuntosRecurrentesPage } from './pages/PuntosRecurrentesPage';
@@ -44,6 +45,7 @@ function App() {
         <p className="site-footer__brand"><Logo variante="mono" size={40} className="site-footer__logo" />Calles Seguras <span>Juárez</span></p>
         <p>Información pública para una movilidad más segura en Ciudad Juárez, Chihuahua.</p>
         <p className="site-footer__note"><Icon name="shield" size={16} />Las vistas públicas nunca muestran datos de quien reporta.</p>
+        <SeccionInstalacion />
       </div>
     </footer>
     </>
