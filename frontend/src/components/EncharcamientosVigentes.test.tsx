@@ -34,11 +34,24 @@ describe('<EncharcamientosVigentes /> (HU-03.2, HU-03.3)', () => {
     expect(screen.getByText(/reinicia las 6 horas de vigencia/)).toBeInTheDocument()
   })
 
-  it('sin sesión no muestra votos: invita a iniciar sesión', () => {
+  it('sin sesión muestra «Sigue ahí» y «Ya no hay agua (n/3)» con sus contadores y lleva a iniciar sesión', () => {
     mostrar(false)
+    const grupo = screen.getByRole('group', { name: /inicia sesión para confirmar/i })
+    expect(within(grupo).getByRole('link', { name: /sigue ahí/i })).toHaveAttribute('href', '/login')
+    expect(within(grupo).getByRole('link', { name: /sigue ahí/i })).toHaveTextContent('9')
+    expect(within(grupo).getByRole('link', { name: /ya no hay agua/i })).toHaveTextContent('(1/3)')
+    expect(within(grupo).getByRole('link', { name: /ya no hay agua/i })).toHaveAttribute('href', '/login')
     expect(screen.queryByRole('button', { name: /sigue ahí/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Inicia sesión para confirmar' })).toHaveAttribute('href', '/login')
-    expect(api.get).not.toHaveBeenCalled()
+    expect(api.get).not.toHaveBeenCalled() // sin sesión no se consulta el detalle (RN-04: nada del autor)
+  })
+
+  it('si la carga falla muestra el error y permite reintentar', async () => {
+    const user = userEvent.setup()
+    const reintentar = vi.fn()
+    render(<EncharcamientosVigentes vigentes={[]} estado="error" error="No fue posible conectar con el servidor." autenticado={false} ahora={AHORA} seleccionado={null} onSeleccionar={() => undefined} onReintentar={reintentar} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos cargar los encharcamientos vigentes.')
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(reintentar).toHaveBeenCalledOnce()
   })
 
   it('oculta los votos a quien creó el reporte (HU-03.3)', async () => {

@@ -54,7 +54,7 @@ export function SiteHeader() {
   ];
 
   return (
-    <header className="site-header">
+    <header className={`site-header${autenticado ? ' site-header--sesion' : ''}`}>
       <div className="site-header__inner">
         <Marca />
         <InstalarApp />

@@ -8,7 +8,6 @@ import { guardarConsulta, leerConsulta, useEnLinea } from '../services/offline';
 import { fusionarEnVivo, PATRON_FOLIO, SIN_FILTROS, type FiltrosLista as Filtros } from '../utils/enVivo';
 import { fechaHora } from '../utils/formato';
 import { ReportCard } from '../components/ReportCard';
-import { ZoneSection } from '../components/ZoneSection';
 import { Pagination } from '../components/AdminShared';
 import { Icon } from '../components/Icon';
 import { EmptyState, ReportGridSkeleton, TypeGlyph } from '../components/ui';
@@ -108,7 +107,8 @@ export function PublicHomePage() {
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => { const reloj = window.setInterval(() => setAhora(Date.now()), 60_000); return () => window.clearInterval(reloj); }, []);
-  const encharcamientos = useCargaDatos<RespuestaPaginada<ReporteResumenPublico>>(`${RUTA_VIGENTES}#${reconexiones}`, obtenerJson, 'No fue posible cargar los encharcamientos vigentes.');
+  const [intentoVigentes, setIntentoVigentes] = useState(0);
+  const encharcamientos = useCargaDatos<RespuestaPaginada<ReporteResumenPublico>>(`${RUTA_VIGENTES}#${reconexiones}-${intentoVigentes}`, obtenerJson, 'No fue posible cargar los encharcamientos vigentes.');
   const vigentes = useMemo(() => vigentesOrdenados(fusionarEnVivo(encharcamientos.datos?.datos ?? [], enVivo.vivos, FILTRO_VIGENTES, true), ahora), [encharcamientos.datos, enVivo.vivos, ahora]);
   const estadoVigentes = encharcamientos.estado === 'error' ? 'error' : encharcamientos.estado === 'listo' ? 'listo' : 'cargando';
 
@@ -156,9 +156,7 @@ export function PublicHomePage() {
         <TableroPortada filtros={paramsFiltros(aplicados).toString()} filtrosLista={aplicados} vivos={enVivo.vivos} seleccionado={seleccionado} onSeleccionar={setSeleccionado} />
       </section>
 
-      <EncharcamientosVigentes vigentes={vigentes} estado={estadoVigentes} error={encharcamientos.error} autenticado={autenticado} ahora={ahora} seleccionado={seleccionado} onSeleccionar={setSeleccionado} />
-
-      <ZoneSection />
+      <EncharcamientosVigentes vigentes={vigentes} estado={estadoVigentes} error={encharcamientos.error} autenticado={autenticado} ahora={ahora} seleccionado={seleccionado} onSeleccionar={setSeleccionado} onReintentar={() => setIntentoVigentes((n) => n + 1)} />
 
       <section className="reports-section" aria-labelledby="reportes-titulo">
         <div className="section-heading">

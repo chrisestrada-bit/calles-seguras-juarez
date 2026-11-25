@@ -218,7 +218,7 @@
   .rain-banner__link { width: 100%; justify-content: center; }
 }
 .nav-list a { white-space: nowrap; }
-@media (min-width: 64em) and (max-width: 84.99em) {
+@media (min-width: 64em) and (max-width: 79.99em) {
   .session-user__meta { display: none; }
   .nav-list a { padding: 0 var(--s-3); }
 }
@@ -279,3 +279,33 @@
 @keyframes splash-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes splash-logo { from { opacity: 0; transform: scale(0.86) rotate(-8deg); } to { opacity: 1; transform: none; } }
 @keyframes splash-barra { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ——— Cabecera de escritorio: orden determinista, sin desbordes en pantallas anchas ———
+   El contenedor conserva el ancho de página (--page-max). En escritorio el menú usa display: contents
+   para que navegación y acciones de cuenta se acomoden por filas, en lugar de envolver al azar:
+   · con sesión: fila 1 = marca + acciones de cuenta + avisos + tema; fila 2 = navegación pública.
+   · sin sesión (>= 80em): una sola fila; entre 64em y 80em, navegación en la segunda fila. */
+@media (min-width: 64em) {
+  .site-header__inner { flex-wrap: wrap; row-gap: var(--s-2); }
+  .site-header__menu, .site-header__menu.is-open { display: contents; }
+  .brand { order: 0; }
+  .session-actions { order: 1; flex-wrap: nowrap; }
+  .install-button { order: 2; }
+  .bell { order: 3; }
+  .theme-toggle { order: 4; }
+  .site-header__menu nav { order: 5; flex: 1 1 100%; display: flex; justify-content: flex-start; min-width: 0; }
+  .site-header__menu .nav-list { flex-wrap: wrap; }
+}
+@media (min-width: 80em) {
+  .site-header:not(.site-header--sesion) .site-header__menu nav { order: 1; flex: 1 1 auto; justify-content: center; }
+  .site-header:not(.site-header--sesion) .session-actions { order: 2; }
+}
+
+/* Móvil muy angosto con sesión (avisos + tema + menú): compactar para que todo quepa en una sola fila.
+   Los botones siguen en 40 px, por encima del objetivo táctil de WCAG 2.2 (24 px). */
+@media (max-width: 25em) {
+  .site-header--sesion .site-header__inner { column-gap: var(--s-2); padding-inline: var(--s-3); }
+  .site-header--sesion .brand { gap: 0.375rem; }
+  .site-header--sesion .brand__text { font-size: 0.875rem; }
+  .site-header--sesion :is(.theme-toggle, .menu-toggle, .bell__button) { width: 2.5rem; height: 2.5rem; min-height: 2.5rem; }
+}

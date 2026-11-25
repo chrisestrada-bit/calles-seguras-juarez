@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import { Icon } from './Icon';
+import { LimiteError } from './LimiteError';
 import { StatusBadge, TypeBadge, TypeGlyph } from './ui';
 import { fusionarEnVivo, type FiltrosLista, type Vivos } from '../utils/enVivo';
 import { horaLocal } from '../utils/vigencia';
@@ -34,7 +35,12 @@ export function TableroPortada({ filtros, filtrosLista, vivos, seleccionado, onS
 
   const todos = useMemo(() => fusionarEnVivo(mapa.datos?.datos ?? [], vivos, filtrosLista, true), [mapa.datos, vivos, filtrosLista]);
   const visibles = useMemo(() => todos.filter((m) => capas[m.tipo_dano]), [todos, capas]);
-  const elegido = visibles.find((m) => m.folio === seleccionado) ?? visibles.find((m) => m.nivel_agua === 'intransitable') ?? visibles[0] ?? null;
+  // Foco por omisión: un encharcamiento vigente intransitable, luego cualquier reporte vigente/abierto y al final el primero.
+  const elegido = visibles.find((m) => m.folio === seleccionado)
+    ?? visibles.find((m) => m.estado === 'Activo' && m.nivel_agua === 'intransitable')
+    ?? visibles.find((m) => m.estado === 'Activo')
+    ?? visibles.find((m) => m.estado !== 'Histórico' && m.estado !== 'Reparado' && m.estado !== 'Rechazado')
+    ?? visibles[0] ?? null;
 
   const ind = indicadores.datos;
   const abiertos = ind ? ABIERTOS.reduce((suma, e) => suma + (ind.pavimento.por_estado[e] ?? 0), 0) : null;
@@ -62,9 +68,13 @@ export function TableroPortada({ filtros, filtrosLista, vivos, seleccionado, onS
         {mapa.estado === 'listo' && todos.length > 0 && visibles.length === 0 && <div className="tablero__estado" role="status"><Icon name="layers" size={18} />Activa al menos una capa para ver reportes.</div>}
         {mapaCaido && <div className="tablero__estado tablero__estado--error" role="alert"><Icon name="alert" size={18} />No pudimos cargar los mosaicos del mapa. Los mismos reportes están en la lista de abajo.</div>}
         {mapa.estado === 'listo' && visibles.length > 0 && !mapaCaido && (
+          <LimiteError respaldo={<div className="tablero__estado tablero__estado--error" role="alert"><Icon name="alert" size={18} />No pudimos dibujar el mapa. Los mismos reportes están en la lista de reportes recientes.</div>}>
           <Suspense fallback={<div className="tablero__estado" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}>
-            <ReportMap marcadores={visibles} seleccionado={elegido?.folio ?? null} onSeleccionar={onSeleccionar} miUbicacion={null} onFalloMapa={() => setMapaCaido(true)} etiqueta="Mapa de la portada con los reportes de la consulta actual. Los mismos reportes están en la lista de reportes recientes." />
+            {/* Sólo la selección hecha por la persona mueve el mapa: una selección por omisión al montar dispara
+                zoomToShowLayer mientras markercluster agrupa cientos de puntos y rompía la página. */}
+            <ReportMap marcadores={visibles} seleccionado={seleccionado && visibles.some((m) => m.folio === seleccionado) ? seleccionado : null} onSeleccionar={onSeleccionar} miUbicacion={null} onFalloMapa={() => setMapaCaido(true)} etiqueta="Mapa de la portada con los reportes de la consulta actual. Los mismos reportes están en la lista de reportes recientes." />
           </Suspense>
+          </LimiteError>
         )}
       </div>
 
