@@ -17,7 +17,16 @@ const GLIFO: Record<TipoDano, { letra: string; trazo: string }> = {
   Encharcamiento: { letra: 'E', trazo: '<path d="M3 17c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1"/><path d="M12 3.5s-3 3.4-3 5.5a3 3 0 0 0 6 0c0-2.1-3-5.5-3-5.5Z"/>' },
 };
 
+/** Gota de agua para encharcamientos (HU-03.x): forma propia, glifo + letra; anillo si es intransitable, atenuada si es histórica. */
+function iconoEncharcamiento(m: MarcadorMapa, seleccionado: boolean): L.DivIcon {
+  const g = GLIFO.Encharcamiento;
+  const clases = ['map-drop', seleccionado && 'is-selected', m.nivel_agua === 'intransitable' && 'map-drop--critico', m.estado !== 'Activo' && 'map-drop--historico'].filter(Boolean).join(' ');
+  const html = `<span class="${clases}" aria-hidden="true"><span class="map-drop__cuerpo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${g.trazo}</svg><b>${g.letra}</b></span></span>`;
+  return L.divIcon({ html, className: 'map-pin-wrap', iconSize: [40, 46], iconAnchor: [20, 44] });
+}
+
 export function iconoDe(m: MarcadorMapa, seleccionado: boolean): L.DivIcon {
+  if (m.tipo_dano === 'Encharcamiento') return iconoEncharcamiento(m, seleccionado);
   const g = GLIFO[m.tipo_dano];
   const html = `<span class="map-pin map-pin--${tonoDeTipo(m.tipo_dano)}${seleccionado ? ' is-selected' : ''}" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${g.trazo}</svg><b>${g.letra}</b></span>`;
   return L.divIcon({ html, className: 'map-pin-wrap', iconSize: [44, 30], iconAnchor: [22, 15] });

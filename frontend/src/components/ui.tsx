@@ -149,9 +149,9 @@ export function ReportGridSkeleton({ count = 6, label = 'Cargando reportes…' }
       <span className="visually-hidden">{label}</span>
       {Array.from({ length: count }, (_, i) => (
         <div className="report-card report-card--skeleton" key={i} aria-hidden="true">
-          <div className="skeleton-row"><span className="skeleton-row__lead"><span className="skeleton skeleton--tile" /><span className="skeleton skeleton--pill" /></span><span className="skeleton skeleton--pill skeleton--short" /></div>
-          <span className="skeleton skeleton--title" /><span className="skeleton skeleton--text" />
-          <div className="skeleton-row skeleton-row--foot"><span className="skeleton skeleton--text skeleton--short" /><span className="skeleton skeleton--text skeleton--short" /></div>
+          <span className="skeleton-row__lead"><span className="skeleton skeleton--tile" /><span className="skeleton skeleton--pill" /></span>
+          <span className="report-card__place"><span className="skeleton skeleton--text skeleton--short" /><span className="skeleton skeleton--title" /></span>
+          <span className="skeleton skeleton--pill skeleton--short" />
         </div>
       ))}
     </div>

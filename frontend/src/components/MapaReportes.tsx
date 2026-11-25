@@ -73,7 +73,7 @@ export function MapaReportes({ filtros, onVerLista, vivos = {}, filtrosLista }: 
       {consulta.estado === 'listo' && marcadores.length > 0 && (
         <div className="map-layout">
           <Suspense fallback={<div className="map-state" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}>
-            <ReportMap marcadores={marcadores} seleccionado={seleccionado} onSeleccionar={setSeleccionado} miUbicacion={miUbicacion} onFalloMapa={() => setMapaCaido(true)} />
+            <ReportMap marcadores={marcadores} seleccionado={seleccionado} onSeleccionar={setSeleccionado} miUbicacion={miUbicacion} onFalloMapa={() => setMapaCaido(true)} claveEncuadre={filtros} />
           </Suspense>
           <aside className="map-panel" aria-live="polite" aria-label="Resumen del reporte seleccionado">
             {elegido ? (

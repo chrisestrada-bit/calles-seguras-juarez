@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError, descargarArchivo } from '../services/api';
 import { useAuth } from '../context/useAuth';
-import { agruparPorSector, cargarColonias, etiquetaColonia } from '../services/catalogos';
+import { agruparPorSector, cargarColonias, etiquetaColonia, filtrarColonias } from '../services/catalogos';
 import { obtenerJson, useCargaDatos } from '../hooks/useCargaDatos';
 import { useEncharcamientosEnVivo } from '../hooks/useEncharcamientosEnVivo';
 import { guardarConsulta, leerConsulta, useEnLinea } from '../services/offline';
@@ -15,7 +15,8 @@ import { AlertaPrioritaria } from '../components/AlertaPrioritaria';
 import { TableroPortada } from '../components/TableroPortada';
 import { EncharcamientosVigentes } from '../components/EncharcamientosVigentes';
 import { vigentesOrdenados } from '../utils/vigencia';
-import type { ReporteResumenPublico, ReportePublico, RespuestaPaginada, TipoDano, EstadoReporte } from '../types/api';
+import { BuscadorCalle, type CalleSugerida } from '../components/BuscadorCalle';
+import type { Colonia, ReporteResumenPublico, ReportePublico, RespuestaPaginada, TipoDano, EstadoReporte } from '../types/api';
 
 const MapaReportes = lazy(() => import('../components/MapaReportes').then((m) => ({ default: m.MapaReportes })));
 
@@ -113,6 +114,38 @@ export function PublicHomePage() {
   const estadoVigentes = encharcamientos.estado === 'error' ? 'error' : encharcamientos.estado === 'listo' ? 'listo' : 'cargando';
 
   const aplicar = (siguientes: Filtros) => { setAplicados(siguientes); setPagina(1); };
+
+  // Búsqueda en vivo (HU-04.2): al escribir se consulta sola con debounce de 450 ms para no saturar la API.
+  // Sólo textos que la API entiende: vacío, folio exacto o calle de 3+ letras (un número suelto es un C.P. y va a las sugerencias).
+  const textoBuscado = borrador.busqueda.trim();
+  useEffect(() => {
+    if (textoBuscado === aplicados.busqueda.trim()) return;
+    const valida = textoBuscado === '' || PATRON_FOLIO.test(textoBuscado) || (textoBuscado.length >= 3 && !/^\d+$/.test(textoBuscado));
+    if (!valida) return;
+    const espera = window.setTimeout(() => { setAplicados((actual) => ({ ...actual, busqueda: textoBuscado })); setPagina(1); }, 450);
+    return () => window.clearTimeout(espera);
+  }, [textoBuscado, aplicados.busqueda]);
+
+  const colonias = useMemo(() => catalogo.datos ?? [], [catalogo.datos]);
+  // Calles con reportes que coinciden con lo escrito (de la consulta en vivo ya resuelta).
+  const callesSugeridas = useMemo<CalleSugerida[]>(() => {
+    if (textoBuscado.length < 3 || aplicados.busqueda.trim().toLowerCase() !== textoBuscado.toLowerCase()) return [];
+    const vistas = new Set<string>();
+    return (base ?? []).filter((r) => { const clave = `${r.calle}|${r.colonia.nombre}`; if (vistas.has(clave)) return false; vistas.add(clave); return true; })
+      .map((r) => ({ calle: r.calle, colonia: r.colonia.nombre }));
+  }, [base, textoBuscado, aplicados.busqueda]);
+  // Sin resultados: si lo buscado es una colonia o un C.P., se proponen como filtro.
+  const coloniasSinResultados = useMemo(() => (aplicados.busqueda.trim() ? filtrarColonias(colonias, aplicados.busqueda, 4) : []), [colonias, aplicados.busqueda]);
+  const irAResultados = () => document.getElementById('reportes-titulo')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  /** Elegir una colonia (por nombre o C.P.) aplica el filtro real de colonia y limpia el texto. */
+  const elegirColonia = useCallback((c: Colonia) => {
+    const siguientes = { ...borrador, busqueda: '', colonia: String(c.id) };
+    setBorrador(siguientes); setAplicados(siguientes); setPagina(1); irAResultados();
+  }, [borrador]);
+  const elegirCalle = useCallback((calle: string) => {
+    const siguientes = { ...borrador, busqueda: calle };
+    setBorrador(siguientes); setAplicados(siguientes); setPagina(1); irAResultados();
+  }, [borrador]);
   /** Listas y fechas filtran al cambiar (con la calle escrita); la calle o el folio, al pulsar «Buscar». */
   const cambiar = (campo: keyof Filtros, valor: string) => {
     setBorrador((actual) => ({ ...actual, [campo]: valor }));
@@ -126,11 +159,16 @@ export function PublicHomePage() {
   };
   const buscar = (evento: FormEvent) => { evento.preventDefault(); aplicar(borrador); };
   /** Buscador de la portada: aplica la misma búsqueda de calle/folio (HU-04.2) y lleva a los resultados. */
-  const consultarCalle = (evento: FormEvent) => {
-    evento.preventDefault();
-    aplicar(borrador);
-    document.getElementById('reportes-titulo')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-  };
+  const consultarCalle = useCallback(() => {
+    // Un C.P. de 5 dígitos con una sola colonia se resuelve como filtro de colonia; si hay varias, se eligen en las sugerencias.
+    if (/^\d{5}$/.test(textoBuscado)) {
+      const conCp = colonias.filter((c) => c.codigo_postal === textoBuscado);
+      if (conCp.length === 1) { elegirColonia(conCp[0]); return; }
+      if (conCp.length > 1) return;
+    }
+    setAplicados(borrador); setPagina(1);
+    irAResultados();
+  }, [textoBuscado, colonias, elegirColonia, borrador]);
   const limpiar = () => { setBorrador(SIN_FILTROS); aplicar(SIN_FILTROS); };
 
   return (
@@ -140,15 +178,7 @@ export function PublicHomePage() {
           <h1 id="portada-titulo" className="reveal">Antes de salir, <em>lee la calle.</em></h1>
           <p className="portada__entrada reveal reveal--2">Baches, alcantarillas sin tapa y encharcamientos reportados por vecinos de Ciudad Juárez, con su estado de reparación al minuto. Nunca mostramos datos de quien reporta.</p>
 
-          <form className="consulta-calle reveal reveal--3" role="search" onSubmit={consultarCalle}>
-            <label htmlFor="consulta-calle">¿Por qué calle vas a circular?</label>
-            <div className="consulta-calle__campo">
-              <Icon name="search" size={20} />
-              <input id="consulta-calle" placeholder="Calle o folio, ej. Tecnológico" value={borrador.busqueda} onChange={(e) => cambiar('busqueda', e.target.value)} aria-describedby="consulta-calle-ayuda" autoComplete="off" />
-              <button className="button" type="submit">Consultar</button>
-            </div>
-            <p id="consulta-calle-ayuda" className="consulta-calle__ayuda">Escribe al menos 3 letras de la calle o el folio completo.</p>
-          </form>
+          <BuscadorCalle valor={borrador.busqueda} onCambiar={(texto) => cambiar('busqueda', texto)} onEnviar={consultarCalle} colonias={colonias} calles={callesSugeridas} onElegirColonia={elegirColonia} onElegirCalle={elegirCalle} />
 
           <AlertaPrioritaria vigentes={vigentes} estado={estadoVigentes} ahora={ahora} onSeleccionar={setSeleccionado} />
         </div>
@@ -226,7 +256,15 @@ export function PublicHomePage() {
 
         {vista === 'mapa' ? <Suspense fallback={<div className="map-state" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}><MapaReportes filtros={paramsFiltros(aplicados).toString()} onVerLista={() => setVista('lista')} vivos={enVivo.vivos} filtrosLista={aplicados} /></Suspense> : <>
         {cargando ? <ReportGridSkeleton count={6} /> : error ? <div className="form-error" role="alert">{error}</div> : reportes.length === 0
-          ? <EmptyState art="search" title="No hay reportes que coincidan con tus filtros" action={<a className="button button--primary" href="/reportar"><Icon name="plus" size={18} />Reportar un daño</a>}>{hayFiltros ? 'Prueba con otra calle, otra colonia u otras fechas, o usa «Limpiar filtros».' : 'Aún no hay reportes públicos. Sé la primera persona en reportar un daño.'}</EmptyState>
+          ? <EmptyState art="search" title="No hay reportes que coincidan con tus filtros" action={<>
+              {coloniasSinResultados.length > 0 && (
+                <div className="sugerencias-vacio">
+                  <p>¿Buscabas una colonia? Filtra por ella:</p>
+                  <ul>{coloniasSinResultados.map((c) => <li key={c.id}><button className="pill" type="button" onClick={() => elegirColonia(c)}><Icon name="pin" size={16} />{etiquetaColonia(c)}</button></li>)}</ul>
+                </div>
+              )}
+              <a className="button button--primary" href="/reportar"><Icon name="plus" size={18} />Reportar un daño</a>
+            </>}>{hayFiltros ? 'Prueba con otra calle, otra colonia u otras fechas, o usa «Limpiar filtros».' : 'Aún no hay reportes públicos. Sé la primera persona en reportar un daño.'}</EmptyState>
           : <ListaConTusColonias reportes={reportes} />}
         <Pagination page={pagina} total={totalPaginas} onChange={setPagina} label="Paginación de reportes" />
         </>}

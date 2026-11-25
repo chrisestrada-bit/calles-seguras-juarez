@@ -17,20 +17,26 @@ interface Props {
   onFalloMapa: () => void;
   /** Nombre accesible de la región (cada mapa de la página debe tener uno distinto). */
   etiqueta?: string;
+  /** Al cambiar esta clave (p. ej. los filtros) el mapa se reencuadra; las actualizaciones en vivo no mueven la vista. */
+  claveEncuadre?: string;
 }
 
 const ETIQUETA_PREDETERMINADA = 'Mapa interactivo de reportes en Ciudad Juárez. Los mismos reportes están disponibles como lista debajo del mapa.';
 
-export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion, onFalloMapa, etiqueta = ETIQUETA_PREDETERMINADA }: Props) {
+export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion, onFalloMapa, etiqueta = ETIQUETA_PREDETERMINADA, claveEncuadre = '' }: Props) {
   const contenedor = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const grupo = useRef<L.MarkerClusterGroup | null>(null);
   const yo = useRef<L.CircleMarker | null>(null);
   const porFolio = useRef(new Map<string, { marker: L.Marker; datos: MarcadorMapa }>());
+  // Último encuadre aplicado: sólo se vuelve a encuadrar si cambia la clave (filtros), no con cada evento en vivo.
+  const encuadre = useRef<string | null>(null);
   // Los callbacks vigentes se leen desde refs para no recrear el mapa en cada render.
   const alSeleccionar = useRef(onSeleccionar);
   const alFallar = useRef(onFalloMapa);
-  useEffect(() => { alSeleccionar.current = onSeleccionar; alFallar.current = onFalloMapa; });
+  // La selección vigente también se lee al regenerar íconos (actualizaciones en vivo) para no perder el resaltado.
+  const elegido = useRef(seleccionado);
+  useEffect(() => { alSeleccionar.current = onSeleccionar; alFallar.current = onFalloMapa; elegido.current = seleccionado; });
 
   useEffect(() => {
     if (!contenedor.current) return;
@@ -48,7 +54,7 @@ export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion
     mapa.current = instancia;
     grupo.current = cluster;
     const registro = porFolio.current;
-    return () => { instancia.remove(); mapa.current = null; grupo.current = null; yo.current = null; registro.clear(); };
+    return () => { instancia.remove(); mapa.current = null; grupo.current = null; yo.current = null; registro.clear(); encuadre.current = null; };
   }, []);
 
   useEffect(() => {
@@ -58,7 +64,7 @@ export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion
     porFolio.current.clear();
     const marcas = marcadores.map((m) => {
       const marker = L.marker([m.ubicacion.latitud, m.ubicacion.longitud], {
-        icon: iconoDe(m, false), title: descripcionMarcador(m), alt: descripcionMarcador(m), keyboard: true, riseOnHover: true,
+        icon: iconoDe(m, m.folio === elegido.current), title: descripcionMarcador(m), alt: descripcionMarcador(m), keyboard: true, riseOnHover: true,
       });
       marker.on('click', () => alSeleccionar.current(m.folio));
       marker.on('keypress', (e) => { if ((e.originalEvent as KeyboardEvent).key === 'Enter') alSeleccionar.current(m.folio); });
@@ -68,12 +74,13 @@ export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion
     // Encuadre ANTES de agrupar y con límites calculados de las coordenadas: mover el mapa justo después de
     // addLayers dispara los manejadores de zoom de markercluster a medio agrupar y, con cientos de puntos,
     // rompe con «Cannot use 'in' operator to search for '_leaflet_id' in undefined».
-    if (marcas.length > 0 && mapa.current) {
+    if (marcas.length > 0 && mapa.current && encuadre.current !== claveEncuadre) {
+      encuadre.current = claveEncuadre;
       const limites = L.latLngBounds(marcadores.map((m) => [m.ubicacion.latitud, m.ubicacion.longitud] as L.LatLngTuple));
       mapa.current.fitBounds(limites.pad(0.15), { maxZoom: 15, animate: false });
     }
     cluster.addLayers(marcas);
-  }, [marcadores]);
+  }, [marcadores, claveEncuadre]);
 
   useEffect(() => {
     porFolio.current.forEach(({ marker, datos }, folio) => marker.setIcon(iconoDe(datos, folio === seleccionado)));
