@@ -72,7 +72,7 @@ export function TableroPortada({ filtros, filtrosLista, vivos, seleccionado, onS
           <Suspense fallback={<div className="tablero__estado" role="status"><span className="spinner" aria-hidden="true" />Cargando mapa…</div>}>
             {/* Sólo la selección hecha por la persona mueve el mapa: una selección por omisión al montar dispara
                 zoomToShowLayer mientras markercluster agrupa cientos de puntos y rompía la página. */}
-            <ReportMap marcadores={visibles} seleccionado={seleccionado && visibles.some((m) => m.folio === seleccionado) ? seleccionado : null} onSeleccionar={onSeleccionar} miUbicacion={null} onFalloMapa={() => setMapaCaido(true)} etiqueta="Mapa de la portada con los reportes de la consulta actual. Los mismos reportes están en la lista de reportes recientes." />
+            <ReportMap marcadores={visibles} seleccionado={seleccionado && visibles.some((m) => m.folio === seleccionado) ? seleccionado : null} onSeleccionar={onSeleccionar} miUbicacion={null} onFalloMapa={() => setMapaCaido(true)} claveEncuadre={filtros} etiqueta="Mapa de la portada con los reportes de la consulta actual. Los mismos reportes están en la lista de reportes recientes." />
           </Suspense>
           </LimiteError>
         )}

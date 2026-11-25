@@ -69,3 +69,37 @@
 /* Grupos de marcadores (markercluster) con la identidad: acento del tema y cifra en monoespaciada */
 .marker-cluster, .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-color: rgb(var(--accent-rgb) / 0.25) !important; }
 .marker-cluster div { background-color: var(--route-700) !important; color: var(--bg); font-family: var(--font-mono); font-weight: 500; }
+
+/* ——— Encharcamientos: gota con glifo de agua + letra «E» (forma, ícono y texto; nunca sólo color) ———
+   Claro: azul #0369a1 con tinta papel (5.9:1). Oscuro: celeste #7dd3fc con tinta obsidiana (--pin-ink). */
+.map-drop { position: relative; display: block; width: 40px; height: 46px; }
+.map-drop__cuerpo {
+  position: absolute; left: 4px; top: 2px; width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+  border-radius: 50% 50% 50% 6px; transform: rotate(-45deg);
+  background: linear-gradient(135deg, var(--water-700) 35%, var(--water-800));
+  border: 2px solid var(--surface); color: var(--pin-ink, #fff);
+  box-shadow: 0 4px 10px -2px rgb(20 20 18 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  transition: transform var(--dur-2) var(--ease-spring);
+}
+.map-drop__cuerpo > * { transform: rotate(45deg); }
+.map-drop__cuerpo svg { width: 15px; height: 15px; }
+.map-drop__cuerpo b { font-size: 10px; font-weight: 800; line-height: 1; }
+/* Sombra de apoyo bajo la punta */
+.map-drop::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 12px; height: 4px; margin-left: -6px; border-radius: 50%; background: rgb(20 20 18 / 0.28); filter: blur(1px); }
+/* Intransitable: anillo de alerta y pulso */
+.map-drop--critico .map-drop__cuerpo { box-shadow: 0 0 0 3px var(--manhole-700), 0 4px 10px -2px rgb(20 20 18 / 0.45); }
+.map-drop--critico::before {
+  content: ""; position: absolute; left: 4px; top: 2px; width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--manhole-700); opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) { .map-drop--critico::before { animation: gota-pulso 2.2s var(--ease-out) infinite; } }
+@keyframes gota-pulso { 0% { transform: scale(0.9); opacity: 0.7; } 100% { transform: scale(1.8); opacity: 0; } }
+/* Histórico: atenuado y con borde punteado para destacar los vigentes */
+.map-drop--historico .map-drop__cuerpo { background: var(--surface); color: var(--water-700); border: 2px dashed var(--water-700); box-shadow: 0 2px 6px -2px rgb(20 20 18 / 0.35); }
+.map-drop--historico { opacity: 0.8; }
+/* Selección y foco */
+.map-drop.is-selected .map-drop__cuerpo { transform: rotate(-45deg) scale(1.15); outline: 3px solid var(--route-700); outline-offset: 2px; }
+.leaflet-marker-icon:focus-visible .map-drop__cuerpo { outline: 3px solid var(--route-700); outline-offset: 2px; }
+.leaflet-marker-icon:hover .map-drop__cuerpo { transform: rotate(-45deg) scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .map-drop.is-selected .map-drop__cuerpo, .leaflet-marker-icon:hover .map-drop__cuerpo { transform: rotate(-45deg); } }
