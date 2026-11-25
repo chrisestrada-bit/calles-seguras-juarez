@@ -14,14 +14,17 @@ interface Props {
   ahora: number;
   seleccionado: string | null;
   onSeleccionar: (folio: string) => void;
+  /** Vuelve a consultar la lista si la carga falló. */
+  onReintentar?: () => void;
 }
 
 /**
  * HU-03.2 / HU-03.3: encharcamientos vigentes con su vigencia de 6 h y los votos «Sigue ahí» / «Ya no hay agua».
  * Los votos usan el mismo endpoint que el detalle (POST /reportes/{folio}/confirmaciones) y se ocultan
- * a quien creó el reporte (es_mio, sólo disponible en el detalle autenticado).
+ * a quien creó el reporte (es_mio, sólo disponible en el detalle autenticado). Sin sesión los botones se ven
+ * con sus contadores públicos y llevan a iniciar sesión (votar requiere cuenta, RN-06).
  */
-export function EncharcamientosVigentes({ vigentes, estado, error, autenticado, ahora, seleccionado, onSeleccionar }: Props) {
+export function EncharcamientosVigentes({ vigentes, estado, error, autenticado, ahora, seleccionado, onSeleccionar, onReintentar }: Props) {
   return (
     <section className="agua-vigente" aria-labelledby="agua-titulo">
       <div className="agua-vigente__cabeza">
@@ -29,7 +32,16 @@ export function EncharcamientosVigentes({ vigentes, estado, error, autenticado, 
         <p>Cada «Sigue ahí» reinicia las 6 horas de vigencia. Con {DESMENTIDOS_PARA_HISTORICO} «Ya no hay agua» de personas distintas pasa a histórico.</p>
       </div>
       {estado === 'cargando' && <div className="agua-vigente__estado" role="status"><span className="spinner" aria-hidden="true" />Cargando encharcamientos vigentes…</div>}
-      {estado === 'error' && <div className="form-error" role="alert">{error}</div>}
+      {estado === 'error' && (
+        <div className="agua-vigente__error" role="alert">
+          <Icon name="alert" size={20} />
+          <div>
+            <strong>No pudimos cargar los encharcamientos vigentes.</strong>
+            <p>{error} Si el problema sigue, consulta el mapa o la lista de reportes más abajo.</p>
+          </div>
+          {onReintentar && <button className="button button--secondary button--sm" type="button" onClick={onReintentar}><Icon name="history" size={16} />Reintentar</button>}
+        </div>
+      )}
       {estado === 'listo' && vigentes.length === 0 && (
         <EmptyState art="road" title="Sin encharcamientos vigentes">Ahora mismo nadie ha reportado agua en las calles. Si ves un encharcamiento, repórtalo para avisar a los demás.</EmptyState>
       )}
@@ -90,7 +102,15 @@ function FilaEncharcamiento({ reporte, autenticado, ahora, activo, onSeleccionar
 
       <div className="agua-acciones">
         {historico ? null : !autenticado ? (
-          <a className="agua-acciones__login" href="/login">Inicia sesión para confirmar</a>
+          <div className="agua-votos" role="group" aria-label={`¿Sigue el agua en ${reporte.calle}? Inicia sesión para confirmar`}>
+            <a className="agua-voto" href="/login" aria-describedby={`login-${reporte.folio}`}>
+              <Icon name="water" size={16} />Sigue ahí{vigencia && <span className="tabular">{vigencia.sigue_ahi}</span>}
+            </a>
+            <a className="agua-voto" href="/login" aria-describedby={`login-${reporte.folio}`}>
+              <Icon name="sun" size={16} />Ya no hay agua{vigencia && <span className="tabular">({vigencia.ya_no_hay_agua}/{DESMENTIDOS_PARA_HISTORICO})</span>}
+            </a>
+            <span id={`login-${reporte.folio}`} className="agua-acciones__nota">Inicia sesión para confirmar</span>
+          </div>
         ) : esMio ? (
           <span className="agua-acciones__nota">Es tu reporte: no puedes confirmarlo</span>
         ) : (

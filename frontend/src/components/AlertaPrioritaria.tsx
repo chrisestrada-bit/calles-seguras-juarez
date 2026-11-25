@@ -54,7 +54,7 @@ export function AlertaPrioritaria({ vigentes, estado, ahora, onSeleccionar }: Pr
 
       <div className="alerta__acciones">
         {principal && <a className="button button--sm" href={`/reportes/${encodeURIComponent(principal.folio)}`} onClick={() => onSeleccionar(principal.folio)}>Ver {principal.folio}<Icon name="arrowRight" size={16} /></a>}
-        <a className="button button--secondary button--sm" href="#zona-titulo"><Icon name="locate" size={16} />Revisar mi zona</a>
+        <a className="button button--secondary button--sm" href="/mi-zona"><Icon name="locate" size={16} />Revisar mi zona</a>
         <a className="button button--secondary button--sm" href="/reportar"><Icon name="plus" size={16} />Reportar un daño</a>
       </div>
     </article>

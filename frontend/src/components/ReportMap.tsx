@@ -65,8 +65,14 @@ export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion
       porFolio.current.set(m.folio, { marker, datos: m });
       return marker;
     });
+    // Encuadre ANTES de agrupar y con límites calculados de las coordenadas: mover el mapa justo después de
+    // addLayers dispara los manejadores de zoom de markercluster a medio agrupar y, con cientos de puntos,
+    // rompe con «Cannot use 'in' operator to search for '_leaflet_id' in undefined».
+    if (marcas.length > 0 && mapa.current) {
+      const limites = L.latLngBounds(marcadores.map((m) => [m.ubicacion.latitud, m.ubicacion.longitud] as L.LatLngTuple));
+      mapa.current.fitBounds(limites.pad(0.15), { maxZoom: 15, animate: false });
+    }
     cluster.addLayers(marcas);
-    if (marcas.length > 0 && mapa.current) mapa.current.fitBounds(cluster.getBounds().pad(0.15), { maxZoom: 15 });
   }, [marcadores]);
 
   useEffect(() => {
