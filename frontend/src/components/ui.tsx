@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
+import { Logo } from './Logo';
 import type { Severidad, TipoDano } from '../types/api';
 import type { Tono } from '../utils/formato';
 
@@ -95,7 +96,7 @@ function Illustration({ kind }: { kind: Ilustracion }) {
   return (
     <svg className={`empty-state__art art--${kind}`} width="200" height="140" viewBox="0 0 200 140" aria-hidden="true" focusable="false">
       <defs>
-        <radialGradient id={`art-halo-${kind}`} cx="50%" cy="55%" r="55%"><stop offset="0" stopColor="#dfe6ff" className="art-halo-stop" /><stop offset="1" stopColor="#dfe6ff" stopOpacity="0" className="art-halo-stop" /></radialGradient>
+        <radialGradient id={`art-halo-${kind}`} cx="50%" cy="55%" r="55%"><stop offset="0" className="art-halo-stop" /><stop offset="1" stopOpacity="0" className="art-halo-stop" /></radialGradient>
       </defs>
       <ellipse cx="100" cy="74" rx="96" ry="64" fill={`url(#art-halo-${kind})`} />
       <ellipse cx="100" cy="126" rx="64" ry="6" className="art-ground" />
@@ -132,6 +133,7 @@ function Illustration({ kind }: { kind: Ilustracion }) {
 export function EmptyState({ title, children, action, art = 'road' }: { title: string; children?: ReactNode; action?: ReactNode; art?: Ilustracion }) {
   return (
     <div className="empty-state">
+      <Logo variante="tonal" size={160} className="empty-state__sello" />
       <Illustration kind={art} />
       <h3 className="empty-state__title">{title}</h3>
       {children && <p className="empty-state__text">{children}</p>}
@@ -181,17 +183,9 @@ export function BlockSkeleton({ label = 'Cargando…', lines = 3 }: { label?: st
   );
 }
 
-/* ——— Sello ilustrado para tarjetas de cuenta (decorativo) ——— */
+/* ——— Marca para tarjetas de cuenta (/login, /registro): variante monocromática oficial, decorativa ——— */
 export function AuthArt() {
-  return (
-    <svg className="auth-art" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-      <rect width="64" height="64" rx="18" className="auth-art__tile" />
-      <path d="M8 46c10-2 16-12 26-13s16 4 24-5" className="auth-art__route" />
-      <path d="M18 6c2 14 10 20 15 27s5 16 3 25" className="auth-art__street" />
-      <circle cx="34" cy="33" r="12" className="auth-art__ring" />
-      <circle cx="34" cy="33" r="5" className="auth-art__node" />
-    </svg>
-  );
+  return <Logo variante="acento" size={64} className="auth-art" />;
 }
 
 /** HU-03.4: insignia accesible (ícono + texto + días); el color nunca es el único indicador. */

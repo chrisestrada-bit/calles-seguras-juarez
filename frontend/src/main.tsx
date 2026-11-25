@@ -10,6 +10,7 @@ import './styles/admin.css'
 import './styles/map.css'
 import './styles/tiempo-real.css'
 import './styles/operacion.css'
+import './styles/portada.css'
 import './styles/dark.css'
 
 // HU-08.4: el Service Worker sÃ³lo se registra en producciÃ³n (en desarrollo estorbarÃ­a con la recarga en caliente).

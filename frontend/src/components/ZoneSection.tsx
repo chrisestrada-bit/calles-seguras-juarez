@@ -64,10 +64,9 @@ function Radar({ estado, centro, zona }: { estado: 'espera' | 'escaneando' | 'li
     <div className={`zone-radar zone-radar--${estado}`} aria-hidden="true">
       <svg viewBox="0 0 240 240" focusable="false">
         <defs>
-          <radialGradient id="radar-fondo" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#13214a" /><stop offset="1" stopColor="#070d1a" /></radialGradient>
-          <linearGradient id="radar-haz" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#6ea8ff" stopOpacity="0" /><stop offset="1" stopColor="#6ea8ff" stopOpacity="0.5" /></linearGradient>
+          <linearGradient id="radar-haz" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopOpacity="0" className="radar-haz-stop" /><stop offset="1" stopOpacity="0.5" className="radar-haz-stop" /></linearGradient>
         </defs>
-        <circle cx="120" cy="120" r="112" fill="url(#radar-fondo)" />
+        <circle cx="120" cy="120" r="112" className="radar-fondo" />
         <path d="M120 8v224M8 120h224" className="radar-axis" />
         <circle cx="120" cy="120" r="100" className="radar-ring radar-ring--edge" />
         <circle cx="120" cy="120" r="75" className="radar-ring radar-ring--faint" />

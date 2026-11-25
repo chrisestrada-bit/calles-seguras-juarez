@@ -13,7 +13,7 @@
 .admin-table th, .admin-table td { padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); vertical-align: top; }
 .admin-table thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--ink-2); font-size: var(--text-xs); font-weight: 750; white-space: nowrap; }
 .admin-table tbody tr { transition: background-color var(--dur-1) var(--ease-out); }
-.admin-table tbody tr:hover { background: rgb(59 92 240 / 0.04); }
+.admin-table tbody tr:hover { background: rgb(var(--accent-rgb) / 0.05); }
 .admin-table tbody tr:last-child > * { border-bottom: 0; }
 .admin-table tbody th { font-weight: 750; }
 .admin-table small { color: var(--ink-3); }

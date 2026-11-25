@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import type { MarcadorMapa, Ubicacion } from '../types/api';
+import { colorDeToken } from '../hooks/useTema';
 import { ATRIBUCION, CENTRO_JUAREZ, ERRORES_PARA_FALLAR, LIMITES, TILES_URL, descripcionMarcador, iconoDe } from './mapaUtils';
 
 interface Props {
@@ -14,9 +15,13 @@ interface Props {
   /** Ubicación del usuario (sólo tras pulsar «Centrar en mi ubicación»). */
   miUbicacion: Ubicacion | null;
   onFalloMapa: () => void;
+  /** Nombre accesible de la región (cada mapa de la página debe tener uno distinto). */
+  etiqueta?: string;
 }
 
-export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion, onFalloMapa }: Props) {
+const ETIQUETA_PREDETERMINADA = 'Mapa interactivo de reportes en Ciudad Juárez. Los mismos reportes están disponibles como lista debajo del mapa.';
+
+export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion, onFalloMapa, etiqueta = ETIQUETA_PREDETERMINADA }: Props) {
   const contenedor = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const grupo = useRef<L.MarkerClusterGroup | null>(null);
@@ -74,9 +79,10 @@ export function ReportMap({ marcadores, seleccionado, onSeleccionar, miUbicacion
     if (!mapa.current || !miUbicacion) return;
     const punto: L.LatLngExpression = [miUbicacion.latitud, miUbicacion.longitud];
     yo.current?.remove();
-    yo.current = L.circleMarker(punto, { radius: 9, color: '#13277d', weight: 3, fillColor: '#ffb020', fillOpacity: 1 }).bindTooltip('Tu ubicación').addTo(mapa.current);
+    // Colores de la identidad activa (Leaflet no lee variables CSS directamente).
+    yo.current = L.circleMarker(punto, { radius: 9, color: colorDeToken('--surface', '#ffffff'), weight: 3, fillColor: colorDeToken('--route-700', '#3f6212'), fillOpacity: 1 }).bindTooltip('Tu ubicación').addTo(mapa.current);
     mapa.current.flyTo(punto, 15);
   }, [miUbicacion]);
 
-  return <div ref={contenedor} className="report-map" role="region" aria-label="Mapa interactivo de reportes en Ciudad Juárez. Los mismos reportes están disponibles como lista debajo del mapa." />;
+  return <div ref={contenedor} className="report-map" role="region" aria-label={etiqueta} />;
 }

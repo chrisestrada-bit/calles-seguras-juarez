@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { EncharcamientoEnTrayecto, Ubicacion } from '../types/api';
+import { colorDeToken } from '../hooks/useTema';
 import { ATRIBUCION, CENTRO_JUAREZ, LIMITES, TILES_URL } from './mapaUtils';
 
 interface Props {
@@ -50,7 +51,7 @@ export function TrayectoMapa({ origen, destino, ruta, encharcamientos, onClic }:
     if (origen) L.marker([origen.latitud, origen.longitud], { icon: marca('A', 'road'), title: 'Origen', alt: 'Origen' }).addTo(grupo);
     if (destino) L.marker([destino.latitud, destino.longitud], { icon: marca('B', 'road'), title: 'Destino', alt: 'Destino' }).addTo(grupo);
     if (ruta.length > 1) {
-      const linea = L.polyline(ruta, { color: '#2446d8', weight: 5, opacity: 0.85 }).addTo(grupo);
+      const linea = L.polyline(ruta, { color: colorDeToken('--route-700', '#3f6212'), weight: 5, opacity: 0.85 }).addTo(grupo);
       mapa.current.fitBounds(linea.getBounds().pad(0.2));
     }
     for (const e of encharcamientos) {
