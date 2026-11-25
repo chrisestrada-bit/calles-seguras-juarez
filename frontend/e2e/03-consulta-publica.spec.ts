@@ -37,9 +37,11 @@ test.describe('Consulta pública', () => {
   test('el mapa muestra los reportes con la leyenda y mantiene una lista accesible', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'Mapa', exact: true }).click()
-    await expect(page.getByRole('region', { name: /mapa interactivo de reportes/i })).toBeVisible()
+    // La portada tiene dos mapas Leaflet (el del tablero y éste): las aserciones se acotan al mapa de reportes.
+    const mapa = page.getByRole('region', { name: /mapa interactivo de reportes/i })
+    await expect(mapa).toBeVisible()
     await expect(page.getByRole('list', { name: 'Simbología del mapa' })).toBeVisible()
-    await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible()
+    await expect(mapa.locator('.leaflet-marker-icon').first()).toBeVisible()
     // El mapa no pide la ubicación hasta que la persona lo solicita.
     await expect(page.getByText(/tu navegador te pedirá permiso/i)).toHaveCount(0)
     await expect(page.getByRole('button', { name: /centrar en mi ubicación/i })).toBeVisible()
@@ -47,7 +49,7 @@ test.describe('Consulta pública', () => {
     const lista = page.locator('details.map-list')
     await lista.locator('summary').click()
     await expect(lista.getByRole('link').first()).toHaveAttribute('href', /\/reportes\/(BCH|ENC)-/)
-    await expect(page.locator('.leaflet-control-attribution')).toContainText('OpenStreetMap')
+    await expect(mapa.locator('.leaflet-control-attribution')).toContainText('OpenStreetMap')
   })
 
   test('los filtros activos también se aplican al mapa', async ({ page }) => {
