@@ -46,32 +46,53 @@ describe('Instalar aplicación (HU-08.4)', () => {
     expect(desplazar).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
   })
 
-  it('con beforeinstallprompt el botón superior abre el diálogo y, si se rechaza, vuelve a la guía', async () => {
+  it.each([['superior', () => cabecera()], ['del pie', () => enPie('Instalar aplicación') as HTMLElement]])(
+    'si se cancela el diálogo, el botón %s abre la guía y lleva a ella',
+    async (_, boton) => {
+      const user = userEvent.setup()
+      montar()
+      const { prompt, evento } = ofrecer('dismissed')
+      expect(evento.defaultPrevented).toBe(true)
+      expect(cabecera()).toHaveAccessibleName('Instalar app')
+      // Había una guía abierta de antes: al haber instalación nativa se cierra.
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+      await user.click(boton())
+      expect(prompt).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('list')).toBeInTheDocument()
+      expect(apartado()).toHaveFocus()
+      await user.click(cabecera())
+      expect(prompt).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('si el diálogo falla, abre la guía y lleva a ella', async () => {
     const user = userEvent.setup()
     montar()
-    const { prompt, evento } = ofrecer('dismissed')
-    expect(evento.defaultPrevented).toBe(true)
-    expect(cabecera()).toHaveAccessibleName('Instalar app')
+    const { prompt } = ofrecer('accepted')
+    prompt.mockRejectedValue(new Error('no se pudo abrir'))
     await user.click(cabecera())
-    expect(prompt).toHaveBeenCalledTimes(1)
-    expect(apartado()).not.toHaveFocus()
-    expect(cabecera()).toHaveAccessibleName('Cómo instalar la app')
-    await user.click(cabecera())
-    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('list')).toBeInTheDocument()
     expect(apartado()).toHaveFocus()
   })
 
-  it('conserva el aviso recibido antes de montar; ya instalada (appinstalled) muestra el estado sin guía', async () => {
-    const user = userEvent.setup()
-    const { prompt } = ofrecer('accepted')
-    montar()
-    await user.click(enPie('Instalar aplicación') as HTMLElement)
-    expect(screen.getByRole('status')).toHaveTextContent('ya está instalada')
-    expect(within(apartado()).queryByRole('button')).not.toBeInTheDocument()
-    await user.click(cabecera())
-    expect(prompt).toHaveBeenCalledTimes(1)
-    expect(apartado()).toHaveFocus()
-  })
+  it.each([['superior', () => cabecera()], ['del pie', () => enPie('Instalar aplicación') as HTMLElement]])(
+    'si se acepta desde el botón %s, no muestra la guía; el aviso recibido antes de montar se conserva',
+    async (_, boton) => {
+      const user = userEvent.setup()
+      // Una nueva oferta del navegador deja atrás el estado «instalada» de la vuelta anterior.
+      const { prompt } = ofrecer('accepted')
+      montar()
+      await user.click(boton())
+      expect(prompt).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('status')).toHaveTextContent('ya está instalada')
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+      expect(within(apartado()).queryByRole('button')).not.toBeInTheDocument()
+      expect(apartado()).not.toHaveFocus()
+      await user.click(cabecera())
+      expect(prompt).toHaveBeenCalledTimes(1)
+      expect(apartado()).toHaveFocus()
+    },
+  )
 
   it('abierta en modo standalone muestra que ya está instalada y no ofrece pasos', async () => {
     vi.resetModules()

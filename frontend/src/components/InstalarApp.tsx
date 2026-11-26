@@ -24,17 +24,24 @@ function irAlApartado() {
   apartado.scrollIntoView?.({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'center' });
 }
 
-/**
- * HU-08.4: botón permanente junto a la marca. Con `beforeinstallprompt` abre el diálogo nativo;
- * sin él abre los pasos del pie y, ya instalada, lleva al estado, para que siempre responda.
- */
-export function InstalarApp() {
-  const { estado, instalar, mostrarGuia } = useInstalacion();
-  const alPulsar = () => {
-    if (estado === 'disponible') { void instalar(); return; }
-    if (estado === 'no-disponible') mostrarGuia(true);
+/** Intenta la instalación nativa; si no se logra, abre los pasos del pie y lleva a ellos. */
+function useInstalarOGuiar() {
+  const instalacion = useInstalacion();
+  const instalarOGuiar = async () => {
+    if (await instalacion.instalar()) return;
+    instalacion.mostrarGuia(true);
     irAlApartado();
   };
+  return { ...instalacion, instalarOGuiar };
+}
+
+/**
+ * HU-08.4: botón permanente junto a la marca. Con `beforeinstallprompt` abre el diálogo nativo;
+ * sin él (o si se cancela) abre los pasos del pie y, ya instalada, lleva al estado, para que siempre responda.
+ */
+export function InstalarApp() {
+  const { estado, instalarOGuiar } = useInstalarOGuiar();
+  const alPulsar = () => { if (estado === 'instalada') irAlApartado(); else void instalarOGuiar(); };
   return (
     <button className="button button--secondary button--sm install-button" type="button" onClick={alPulsar} aria-label={estado === 'no-disponible' ? 'Cómo instalar la app' : undefined}>
       <Icon name="download" size={16} />
@@ -45,7 +52,7 @@ export function InstalarApp() {
 
 /** HU-08.4: apartado del pie, siempre visible, que explica en qué estado está la instalación. */
 export function SeccionInstalacion() {
-  const { estado, instalar, guiaAbierta, mostrarGuia } = useInstalacion();
+  const { estado, guiaAbierta, mostrarGuia, instalarOGuiar } = useInstalarOGuiar();
   const guia = PASOS[detectarPlataforma()];
   return (
     <section id={APARTADO} className="instalacion" tabIndex={-1} aria-labelledby="instalacion-titulo">
@@ -55,7 +62,7 @@ export function SeccionInstalacion() {
         {estado === 'disponible' && <p>Instálala para abrirla desde tu pantalla de inicio.</p>}
         {estado === 'no-disponible' && <p>Tu navegador no ofrece en este momento la instalación automática. Puedes instalarla desde su menú.</p>}
       </div>
-      {estado === 'disponible' && <button className="button button--secondary" type="button" onClick={() => void instalar()}><Icon name="download" size={18} />Instalar aplicación</button>}
+      {estado === 'disponible' && <button className="button button--secondary" type="button" onClick={() => void instalarOGuiar()}><Icon name="download" size={18} />Instalar aplicación</button>}
       {estado === 'no-disponible' && (
         <>
           <button className="button button--secondary" type="button" aria-expanded={guiaAbierta} aria-controls={GUIA} onClick={() => mostrarGuia(!guiaAbierta)}>

@@ -35,25 +35,30 @@ const suscriptores = new Set<() => void>();
 const avisar = () => suscriptores.forEach((s) => s());
 
 // Se escucha desde que carga el módulo: el navegador puede disparar el evento antes de que React monte la cabecera.
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); evento = e as EventoInstalacion; recienInstalada = false; avisar(); });
-window.addEventListener('appinstalled', () => { evento = null; recienInstalada = true; avisar(); });
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); evento = e as EventoInstalacion; recienInstalada = false; guiaAbierta = false; avisar(); });
+window.addEventListener('appinstalled', () => { evento = null; recienInstalada = true; guiaAbierta = false; avisar(); });
 consultaModo()?.addEventListener?.('change', avisar);
 
 const suscribir = (s: () => void) => { suscriptores.add(s); return () => { suscriptores.delete(s); }; };
 const leer = (): EstadoInstalacion => (recienInstalada || abiertaComoApp() ? 'instalada' : evento ? 'disponible' : 'no-disponible');
 
-/** Abre el diálogo nativo. El aviso del navegador sólo se puede usar una vez. */
-async function instalar(): Promise<void> {
+/**
+ * Abre el diálogo nativo. Devuelve `true` sólo si la persona acepta; con `false` (sin aviso, rechazo
+ * o falla) quien llama muestra la guía manual. El aviso del navegador sólo se puede usar una vez.
+ */
+async function instalar(): Promise<boolean> {
   const pendiente = evento;
-  if (!pendiente) return;
+  if (!pendiente) return false;
   evento = null;
   avisar(); // ya se consumió: otro clic debe llevar a la guía aunque el diálogo no haya respondido
+  let aceptada = false;
   try {
     await pendiente.prompt();
-    const eleccion = await pendiente.userChoice;
-    if (eleccion.outcome === 'accepted') recienInstalada = true;
-  } catch { /* el navegador rechazó el diálogo: se muestran las instrucciones manuales */ }
+    aceptada = (await pendiente.userChoice).outcome === 'accepted';
+  } catch { /* el navegador no pudo abrir el diálogo */ }
+  if (aceptada) { recienInstalada = true; guiaAbierta = false; }
   avisar();
+  return aceptada;
 }
 
 const leerGuia = () => guiaAbierta;
