@@ -12,7 +12,24 @@ const MODO_APP = '(display-mode: standalone)';
 const consultaModo = () => (typeof window.matchMedia === 'function' ? window.matchMedia(MODO_APP) : null);
 const abiertaComoApp = () => Boolean(consultaModo()?.matches) || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
+/** Navegador/sistema para elegir los pasos manuales de instalación. */
+export type Plataforma = 'ios' | 'android-samsung' | 'android-firefox' | 'android-edge' | 'android' | 'escritorio-firefox' | 'escritorio-safari' | 'escritorio';
+
+export function detectarPlataforma(agente: string = navigator.userAgent, puntosTactiles: number = navigator.maxTouchPoints): Plataforma {
+  // iPadOS se presenta como Macintosh; la pantalla táctil lo delata.
+  if (/iPhone|iPad|iPod/.test(agente) || (/Macintosh/.test(agente) && puntosTactiles > 1)) return 'ios';
+  if (/Android/.test(agente)) {
+    if (/SamsungBrowser/.test(agente)) return 'android-samsung';
+    if (/Firefox/.test(agente)) return 'android-firefox';
+    return /EdgA/.test(agente) ? 'android-edge' : 'android';
+  }
+  if (/Firefox/.test(agente)) return 'escritorio-firefox';
+  if (/Safari/.test(agente) && !/Chrome|Chromium|Edg|OPR/.test(agente)) return 'escritorio-safari';
+  return 'escritorio';
+}
+
 let evento: EventoInstalacion | null = null;
+let guiaAbierta = false;
 let recienInstalada = false;
 const suscriptores = new Set<() => void>();
 const avisar = () => suscriptores.forEach((s) => s());
@@ -39,6 +56,15 @@ async function instalar(): Promise<void> {
   avisar();
 }
 
+const leerGuia = () => guiaAbierta;
+/** La cabecera y el pie comparten la guía: cualquiera de los dos puede abrirla. */
+function mostrarGuia(abierta: boolean): void { guiaAbierta = abierta; avisar(); }
+
 export function useInstalacion() {
-  return { estado: useSyncExternalStore(suscribir, leer), instalar };
+  return {
+    estado: useSyncExternalStore(suscribir, leer),
+    guiaAbierta: useSyncExternalStore(suscribir, leerGuia),
+    instalar,
+    mostrarGuia,
+  };
 }
