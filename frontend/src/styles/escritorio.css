@@ -1,0 +1,66 @@
+/* ==========================================================================
+   Instalación de la app (HU-08.4) y acomodo de acciones en pantallas amplias (>= 80em / 1280 px)
+   Se carga después de las hojas de página para ganar por orden, sin subir especificidad.
+   ========================================================================== */
+
+/* ——— Instalar aplicación ——— */
+.install-button { white-space: nowrap; min-height: 2.5rem; }
+/* Tableta y móvil: la cabecera envuelve; en teléfono el botón ocupa su propia fila completa, sin desbordes */
+@media (max-width: 39.99em) {
+  .install-button { order: 1; flex: 1 0 100%; min-height: 2.75rem; }
+  .site-header__menu { order: 2; }
+}
+.instalacion { display: grid; justify-items: start; gap: var(--s-2); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+.instalacion__titulo { font-size: var(--text-md); color: var(--ink); }
+.instalacion p { max-width: 62ch; }
+.instalacion__lista { display: flex; align-items: center; gap: var(--s-2); color: var(--success-700); font-weight: 650; }
+
+/* La cabecera, el clima y la barra de gestión comparten el margen lateral del contenido */
+@media (min-width: 48em) {
+  .site-header__inner, .staff-bar__list, .rain-banner { padding-inline: var(--s-6); }
+}
+
+/* Tipo de daño en tres columnas: el texto va debajo del ícono para que no se salga de la tarjeta */
+@media (min-width: 40em) {
+  .type-option { grid-template-columns: auto auto minmax(0, 1fr); align-content: start; }
+  .type-option__text { grid-column: 1 / -1; }
+}
+
+/* Origen y destino alineados arriba aunque uno tenga más controles que el otro */
+.trayecto-punto { align-content: start; }
+
+@media (min-width: 80em) {
+  /* ——— Cabecera sin sesión: una sola fila compacta ——— */
+  .site-header:not(.site-header--sesion) .site-header__inner { flex-wrap: nowrap; column-gap: var(--s-3); }
+  .site-header:not(.site-header--sesion) .nav-list a { padding-inline: var(--s-3); }
+  .site-header:not(.site-header--sesion) .nav-list a .icon { display: none; }
+  .site-header:not(.site-header--sesion) .nav-list { flex-wrap: nowrap; }
+  .site-header:not(.site-header--sesion) .session-actions { gap: var(--s-2); }
+  .site-header:not(.site-header--sesion) .session-actions .button { min-height: 2.5rem; padding-inline: var(--s-4); font-size: var(--text-sm); white-space: nowrap; }
+
+  /* ——— Cabecera con sesión: marca a la izquierda; acciones y navegación en un bloque alineado a la derecha ——— */
+  .site-header--sesion .site-header__inner { display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(4, auto); gap: var(--s-2) var(--s-3); }
+  .site-header--sesion .brand { grid-column: 1; grid-row: 1 / span 2; }
+  .site-header--sesion .session-actions { grid-column: 3; grid-row: 1; justify-self: end; }
+  .site-header--sesion .install-button { grid-column: 4; grid-row: 1; }
+  .site-header--sesion .bell { grid-column: 5; grid-row: 1; }
+  .site-header--sesion .theme-toggle { grid-column: 6; grid-row: 1; }
+  .site-header--sesion .site-header__menu nav { grid-column: 2 / -1; grid-row: 2; justify-self: end; }
+
+  /* ——— Acciones junto a lo que afectan, no en la esquina opuesta ——— */
+  .page-intro, .section-heading, .view-toolbar, .map-toolbar { justify-content: flex-start; column-gap: var(--s-8); }
+  .detail-card__badges, .my-report-card__heading, .duplicate-card { justify-content: flex-start; column-gap: var(--s-4); }
+  .agua-vigente__cabeza { flex-direction: column; align-items: flex-start; }
+  .rain-banner__body { flex: 0 1 auto; }
+  .rain-banner__inner { column-gap: var(--s-5); }
+
+  /* Encharcamientos vigentes: votos y «Ver detalle» en un solo renglón, en una columna de ancho fijo */
+  .agua-fila { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.1fr) 27rem; }
+  .agua-acciones { display: grid; grid-template-columns: auto auto; justify-content: end; align-items: start; column-gap: var(--s-4); }
+  .agua-acciones__detalle { line-height: 2.5rem; }
+  .agua-aviso { grid-column: 1 / -1; }
+
+  /* Alerta con tres acciones: la principal a lo ancho y las otras dos en pareja */
+  .alerta__acciones:has(> :nth-child(3)) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .alerta__acciones:has(> :nth-child(3)) > :first-child { grid-column: 1 / -1; }
+}
