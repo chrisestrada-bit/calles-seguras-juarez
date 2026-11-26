@@ -79,7 +79,7 @@ test.describe('Consulta pública', () => {
       const [campo] = await page.getByLabel(/dirección, cruce o colonia/i).all().then((l) => [l[indice]])
       await campo.fill(texto)
       await page.getByRole('button', { name: 'Buscar', exact: true }).nth(indice).click()
-      await page.locator('.search-results button').first().click()
+      await page.getByRole('listbox', { name: /sugerencias/i }).getByRole('option').first().click()
     }
     await buscar(0, colonias[0].nombre)
     await buscar(1, colonias[1].nombre)
