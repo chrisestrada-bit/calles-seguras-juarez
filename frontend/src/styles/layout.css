@@ -290,7 +290,6 @@
   .site-header__menu, .site-header__menu.is-open { display: contents; }
   .brand { order: 0; }
   .session-actions { order: 1; flex-wrap: nowrap; }
-  .install-button { order: 2; }
   .bell { order: 3; }
   .theme-toggle { order: 4; }
   .site-header__menu nav { order: 5; flex: 1 1 100%; display: flex; justify-content: flex-start; min-width: 0; }

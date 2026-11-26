@@ -56,8 +56,10 @@ export function SiteHeader() {
   return (
     <header className={`site-header${autenticado ? ' site-header--sesion' : ''}`}>
       <div className="site-header__inner">
-        <Marca />
-        <InstalarApp />
+        <div className="site-header__marca">
+          <Marca />
+          <InstalarApp />
+        </div>
         {autenticado && rol !== 'enlace_municipal' && <CampanaNotificaciones />}
         <ThemeToggle />
         <button className="menu-toggle" type="button" aria-expanded={abierto} aria-controls="menu-principal" onClick={() => setAbierto((v) => !v)}>
