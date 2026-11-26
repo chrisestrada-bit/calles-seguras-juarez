@@ -22,10 +22,10 @@ async function elegirPuntos(user: ReturnType<typeof userEvent.setup>) {
   const botones = screen.getAllByRole('button', { name: /^buscar$/i })
   await user.type(campos[0], 'Pronaf')
   await user.click(botones[0])
-  await user.click(await screen.findByRole('button', { name: /origen pronaf/i }))
+  await user.click(await screen.findByRole('option', { name: /origen pronaf/i }))
   await user.type(campos[1], 'Centro')
   await user.click(botones[1])
-  await user.click(await screen.findByRole('button', { name: /destino centro/i }))
+  await user.click(await screen.findByRole('option', { name: /destino centro/i }))
 }
 
 beforeEach(() => {
@@ -37,6 +37,25 @@ beforeEach(() => {
 })
 
 describe('<TrayectoPage /> (HU-04.6)', () => {
+  it('sugiere direcciones al escribir y se elige con teclado', async () => {
+    const user = userEvent.setup()
+    render(<TrayectoPage />)
+    await user.type(screen.getAllByRole('combobox')[0], 'Pronaf')
+    expect(await screen.findByRole('option', { name: /origen pronaf/i })).toBeInTheDocument()
+    expect(vi.mocked(api.get).mock.calls.length).toBe(1)
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(await screen.findByText(/origen pronaf \(31\.70000/i)).toBeInTheDocument()
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+  })
+
+  it('no consulta con menos de 3 caracteres', async () => {
+    const user = userEvent.setup()
+    render(<TrayectoPage />)
+    await user.type(screen.getAllByRole('combobox')[0], 'Pr')
+    await new Promise((r) => setTimeout(r, 450))
+    expect(api.get).not.toHaveBeenCalled()
+  })
+
   it('pide origen y destino antes de revisar', async () => {
     const user = userEvent.setup()
     render(<TrayectoPage />)

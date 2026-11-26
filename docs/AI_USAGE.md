@@ -52,6 +52,51 @@ Se trabajó **una fase por vez**, con revisión humana y commit propio entre fas
 * **Hallazgo útil de las pruebas E2E:** detectaron un defecto real que las pruebas de backend no ven (un `<form>` anidado en
   moderación), corregido y cubierto con una prueba de regresión.
 
+## Mantenimiento posterior a `v1.1.0` (PR #33–#38) y cierre `v1.1.1`
+
+`v1.1.0` quedó publicada en `f831eb4` (PR #32) y no se reescribe; los cambios siguientes se cierran con la etiqueta `v1.1.1`.
+
+### PR #33 y #34 — Auditoría final, seguridad y fotos
+
+* **La IA generó:** la auditoría de `docs/auditoria-final/` (hallazgos A1–A4, M1–M9, B1–B6); el endurecimiento de sesión, límites
+  por IP, cabeceras y tamaño de cuerpo; el limpiado de EXIF/GPS y del nombre original de las fotos (`db/limpiar_fotos.py`); el
+  rechazo de imágenes con dimensiones anómalas (`MAX_LADO_PX`, `MAX_PIXELES`); y pruebas de regresión para archivos disfrazados,
+  políglotas, «bombas» de descompresión y *path traversal*.
+* **Decisiones revisadas por personas:** quitar el valor por omisión de `SEED_PASSWORD`; documentar, en lugar de forzar, la
+  configuración de Render (`TRUSTED_PROXY_HOPS`/`CLIENT_IP_HEADER`, disco persistente para `UPLOADS_DIR`).
+
+### PR #35 — Identidad visual
+
+* **La IA generó:** los temas «Claro editorial» (claro) y «Grafito turquesa» (oscuro), la portada editorial y los tokens de
+  color compartidos por ambos temas.
+* **Decisiones revisadas por personas:** la paleta y la tipografía; mantener íconos y texto además del color (`RNF-02`).
+
+### PR #36 — Pulido de portada y ajustes E2E
+
+* **La IA generó:** radar en «Mi zona», cabecera sin desbordes, foco visible en la píldora de búsqueda, filas compactas y
+  búsqueda en vivo; además acotó las aserciones E2E del mapa a la región de reportes.
+* **Hallazgo útil de las pruebas E2E:** las aserciones del mapa coincidían con elementos fuera de la región de reportes; se
+  acotaron sin debilitar lo que validan.
+
+### PR #37 y #38 — Instalación PWA y distribución de escritorio
+
+* **La IA generó:** el hook `useInstalacion`, el botón «Instalar app» junto a la marca, el apartado de instalación en el pie de
+  página (con instrucciones para iPhone/iPad) y la agrupación de acciones de la cabecera en escritorio (`escritorio.css`).
+* **Decisiones revisadas por personas:** el botón se muestra siempre; si el navegador no ofrece el aviso automático, lleva al
+  apartado del pie en lugar de desaparecer.
+
+### Cierre `v1.1.1` (rama `chore/auditoria-final-v1-1`)
+
+* **Se integraron dos ramas pendientes** con `git cherry-pick -x`:
+  - `55333f1` (`fix/autocompletado-trayecto`): autocompletado accesible (combobox/listbox) en origen y destino de `/trayecto`.
+    Hubo un conflicto sólo de CSS en `pages.css`: se conservó lo de `main` y se añadió el bloque del autocompletado. La regla
+    `.hero-map .hm-label` de la rama no se recuperó porque `main` ya no tiene ese elemento.
+  - `4bae380` (`fix/clima-user-agent`): `User-Agent` para Open-Meteo (defecto D-10), fechas de caché sin zona tratadas como UTC
+    (RN-02) y hora de actualización en el aviso de clima.
+* **Corrección menor:** comentario con mojibake en `frontend/src/main.tsx`.
+* **Documentación:** `README.md`, este archivo y `docs/auditoria-final/` (00, 01 y 06).
+* **Verificación:** ver `docs/auditoria-final/00-resumen-ejecutivo.md`.
+
 ## Qué se verificó y cómo
 
 * Las pruebas automatizadas (pytest, Vitest, Playwright) **se ejecutaron**, no sólo se escribieron; sus resultados están en los

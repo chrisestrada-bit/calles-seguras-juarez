@@ -305,3 +305,13 @@ fieldset.report-section:disabled { opacity: 0.6; }
 /* Radar: fondo y haz desde la lámina del tema activo */
 .radar-fondo { fill: var(--plate); }
 .radar-haz-stop { stop-color: var(--plate-glow); }
+
+/* Sugerencias de dirección (combobox/listbox) */
+.inline-form:has(.autocomplete) { position: relative; }
+.autocomplete { flex: 1; min-width: 0; }
+.autocomplete input { width: 100%; }
+.autocomplete__lista { position: absolute; z-index: 1100; inset-inline: 0; top: calc(100% + 2px); list-style: none; margin: 0; padding: var(--s-1); max-height: 16rem; overflow-y: auto; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-lg); box-shadow: 0 8px 24px rgb(0 0 0 / 0.2); }
+.autocomplete__lista[hidden] { display: none; }
+.autocomplete__lista li { display: flex; align-items: flex-start; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-lg); cursor: pointer; overflow-wrap: break-word; }
+.autocomplete__lista li .icon { flex: none; color: var(--route-700); }
+.autocomplete__lista li:hover, .autocomplete__lista li.is-active { background: var(--route-50); outline: 2px solid var(--route-600); outline-offset: -2px; }

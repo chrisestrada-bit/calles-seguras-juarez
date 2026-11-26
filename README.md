@@ -11,6 +11,26 @@ inundación** antes de circular.
 | `db/` | PostgreSQL + migraciones Alembic (`db/migrations/`) + datos semilla idempotentes (`db/seed.py`) |
 | `infra/` | Dockerfiles, `docker-compose.yml` y manifiestos de Kubernetes (`infra/k8s/`) |
 
+## Estado actual: `v1.1.1`
+
+`v1.1.1` es la versión de cierre. Se etiqueta como `v1.1.1` porque `v1.1.0` ya está publicada en `f831eb4` (PR #32) y no se
+reescribe. Incluye la auditoría final (PR #33–#34) y estas novedades visibles:
+
+* **Identidad visual** con dos temas: «Claro editorial» (modo claro) y «Grafito turquesa» (modo oscuro). Ambos se diseñaron con
+  contraste WCAG 2.2 AA, y el estado nunca se comunica sólo con color (íconos y texto).
+* **Instalación como aplicación (PWA):** botón «Instalar app» junto a la marca en la cabecera y un apartado con instrucciones en el
+  pie de página (incluye el caso de iOS, que no ofrece el aviso automático).
+* **Distribución responsiva** probada desde **360 px** (móvil) hasta **1920 px o más** (escritorio amplio), con las acciones de la
+  cabecera agrupadas en escritorio.
+* **Autocompletado en `/trayecto`:** origen y destino sugieren direcciones mientras se escribe (desde 3 caracteres, con espera
+  de 400 ms), se eligen con el teclado (flechas, Enter y Esc) y sólo aceptan puntos dentro de Ciudad Juárez (RN-01).
+* **Clima:** la consulta a Open-Meteo se identifica con `User-Agent` (antes fallaba desde Render) y el aviso muestra la hora de
+  actualización en hora de Ciudad Juárez (RN-02).
+* **Fotos:** se rechazan imágenes con dimensiones anómalas y archivos disfrazados; las fotos públicas no conservan EXIF/GPS (RN-04).
+
+Las tareas de despliegue que dependen del panel de Render están en
+[`docs/auditoria-final/06-plan-de-cierre.md`](docs/auditoria-final/06-plan-de-cierre.md).
+
 ## Arranque rápido (Docker Compose, menos de 3 minutos)
 
 ```bash

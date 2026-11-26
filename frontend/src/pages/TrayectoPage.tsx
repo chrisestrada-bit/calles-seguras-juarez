@@ -1,51 +1,14 @@
 import { lazy, Suspense, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../services/api';
 import { PageIntro } from '../components/AdminShared';
+import { BuscadorPunto, type Punto } from '../components/BuscadorDireccion';
 import { Icon } from '../components/Icon';
 import { EmptyState, Notice } from '../components/ui';
 import { distanciaTexto, fechaHora } from '../utils/formato';
-import type { GeocodingResponse, GeocodingResultado, TrayectoResponse, Ubicacion } from '../types/api';
+import type { TrayectoResponse, Ubicacion } from '../types/api';
 
 const TrayectoMapa = lazy(() => import('../components/TrayectoMapa').then((m) => ({ default: m.TrayectoMapa })));
 const VACIO = 'No hay encharcamientos reportados cerca del trayecto';
-const enJuarez = (p: Ubicacion) => p.latitud >= 31.45 && p.latitud <= 31.8 && p.longitud >= -106.65 && p.longitud <= -106.25;
-
-type Punto = { ubicacion: Ubicacion; etiqueta: string } | null;
-
-function BuscadorPunto({ id, etiqueta, valor, onElegir, conGps }: { id: string; etiqueta: string; valor: Punto; onElegir: (p: Punto) => void; conGps?: boolean }) {
-  const [texto, setTexto] = useState('');
-  const [resultados, setResultados] = useState<GeocodingResultado[]>([]);
-  const [estado, setEstado] = useState('');
-  const buscar = async () => {
-    if (texto.trim().length < 3) { setEstado('Escribe al menos 3 caracteres.'); return; }
-    setEstado('Buscando…');
-    try { const r = await api.get<GeocodingResponse>(`/api/v1/geocoding/buscar?q=${encodeURIComponent(texto.trim())}&limite=5`); setResultados(r.datos); setEstado(r.datos.length ? '' : r.mensaje ?? 'Sin resultados dentro de Ciudad Juárez.'); }
-    catch (e) { setEstado(e instanceof ApiError ? e.message : 'No pudimos buscar la dirección.'); }
-  };
-  const gps = () => {
-    if (!navigator.geolocation) { setEstado('Tu navegador no permite obtener la ubicación.'); return; }
-    setEstado('Tu navegador te pedirá permiso para usar tu ubicación; sólo se usa como punto de origen.');
-    navigator.geolocation.getCurrentPosition(({ coords }) => {
-      const u = { latitud: Number(coords.latitude.toFixed(6)), longitud: Number(coords.longitude.toFixed(6)) };
-      if (!enJuarez(u)) { setEstado('Tu ubicación está fuera de Ciudad Juárez.'); return; }
-      onElegir({ ubicacion: u, etiqueta: 'Mi ubicación' }); setEstado('');
-    }, () => setEstado('No pudimos obtener tu ubicación.'));
-  };
-  return (
-    <fieldset className="trayecto-punto">
-      <legend>{etiqueta}</legend>
-      {valor && <p className="location-readout"><Icon name="pin" size={16} /><span>{valor.etiqueta} ({valor.ubicacion.latitud.toFixed(5)}, {valor.ubicacion.longitud.toFixed(5)})</span></p>}
-      <label htmlFor={id}>Dirección, cruce o colonia</label>
-      <div className="inline-form">
-        <input id={id} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void buscar(); } }} placeholder="Ej. Tecnológico y Ejército Nacional" />
-        <button className="button button--secondary" type="button" onClick={() => void buscar()}><Icon name="search" size={18} />Buscar</button>
-      </div>
-      {conGps && <button className="button button--quiet button--sm" type="button" onClick={gps}><Icon name="locate" size={16} />Usar mi ubicación</button>}
-      {estado && <p className="field-help" role="status">{estado}</p>}
-      {resultados.length > 0 && <ul className="search-results">{resultados.map((r) => <li key={`${r.etiqueta}-${r.ubicacion.latitud}`}><button type="button" onClick={() => { onElegir({ ubicacion: r.ubicacion, etiqueta: r.etiqueta }); setResultados([]); setTexto(''); }}><Icon name="pin" size={18} /><strong>{r.etiqueta}</strong></button></li>)}</ul>}
-    </fieldset>
-  );
-}
 
 /** HU-04.6: revisar mi trayecto antes de circular. */
 export function TrayectoPage() {
