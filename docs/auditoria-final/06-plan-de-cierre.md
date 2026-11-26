@@ -1,5 +1,18 @@
 # 06 · Plan de cierre
 
+## Estado: cierre `v1.1.1`
+
+Lo aplicado en `fix/registro-y-rate-limit` se integró en `main` (PR #33), junto con los PR #34–#38. La rama
+`chore/auditoria-final-v1-1` agrega el autocompletado de `/trayecto`, el `User-Agent` del clima (D-10) y la documentación de
+cierre. La etiqueta final es **`v1.1.1`** porque `v1.1.0` ya está publicada en `f831eb4`.
+
+### Pasos para publicar `v1.1.1`
+
+1. Revisar y fusionar el PR de `chore/auditoria-final-v1-1` en `main`.
+2. Esperar a que la CI quede en verde (pytest con PostgreSQL, Vitest, Playwright y validación de infraestructura).
+3. Crear la etiqueta anotada sobre el merge en `main`: `git tag -a v1.1.1 -m "v1.1.1"` y `git push origin v1.1.1`.
+4. No mover ni borrar `v1.1.0`.
+
 ## Aplicado en `fix/registro-y-rate-limit`
 
 | Hallazgo | Archivos |
@@ -19,6 +32,19 @@
 | Pruebas | `backend/tests/test_auditoria_final.py` (nuevo, 16), `tests/conftest.py`, `tests/test_fase1.py` (las fixtures de imagen ahora son estructuralmente válidas) |
 
 ## Antes de desplegar
+
+### Lista de verificación operativa en Render (`v1.1.1`)
+
+Marca cada punto en el panel de Render; ninguno se puede resolver desde el repositorio.
+
+- [ ] `RUN_SEED=false` en producción. Si se necesita sembrar, usar una `SEED_PASSWORD` nueva de 12 caracteres o más y volver a `false` después.
+- [ ] Rotar o desactivar las cuentas `@ejemplo.mx` de producción, sobre todo si se sembraron con la contraseña publicada antes de A1.
+- [ ] Confirmar qué cabecera trae la IP real y fijar **una** de estas variables: `CLIENT_IP_HEADER` (por ejemplo, `CF-Connecting-IP`) o `TRUSTED_PROXY_HOPS=1`.
+- [ ] Montar un disco persistente en `UPLOADS_DIR`, o migrar las fotos a almacenamiento de objetos. Sin esto, las fotos se pierden en cada despliegue.
+- [ ] Limpiar las fotos existentes: `python db/limpiar_fotos.py --simular`, revisar la salida y luego ejecutarlo sin `--simular`.
+- [ ] Comprobar que `GET /api/v1/clima/pronostico` responde con `desactualizado: false` (prueba de D-10 con el nuevo `User-Agent`).
+
+### Detalle por hallazgo
 
 1. **Producción (A1):**
    - Fijar `RUN_SEED=false`, o bien una `SEED_PASSWORD` nueva de 12 caracteres o más.

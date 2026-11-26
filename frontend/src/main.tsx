@@ -14,7 +14,7 @@ import './styles/portada.css'
 import './styles/escritorio.css'
 import './styles/dark.css'
 
-// HU-08.4: el Service Worker sÃ³lo se registra en producciÃ³n (en desarrollo estorbarÃ­a con la recarga en caliente).
+// HU-08.4: el Service Worker sólo se registra en producción (en desarrollo estorbaría con la recarga en caliente).
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => undefined); });
 }
