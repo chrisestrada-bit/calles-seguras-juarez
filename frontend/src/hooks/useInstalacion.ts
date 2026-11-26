@@ -30,6 +30,7 @@ async function instalar(): Promise<void> {
   const pendiente = evento;
   if (!pendiente) return;
   evento = null;
+  avisar(); // ya se consumió: otro clic debe llevar a la guía aunque el diálogo no haya respondido
   try {
     await pendiente.prompt();
     const eleccion = await pendiente.userChoice;

@@ -11,32 +11,48 @@ const ofrecer = (outcome: 'accepted' | 'dismissed') => {
   return { prompt, evento }
 }
 
+/** En la app la cabecera y el pie conviven: el botón superior es «Instalar app» y el del pie, «Instalar aplicación». */
+const montar = () => render(<><InstalarApp /><SeccionInstalacion /></>)
+const superior = () => screen.getByRole('button', { name: 'Instalar app' })
+const apartado = () => screen.getByRole('region', { name: /en tu dispositivo/i })
+
 describe('Instalar aplicación (HU-08.4)', () => {
-  it('sin aviso del navegador no hay botón y el pie explica cómo instalar a mano', () => {
-    render(<><InstalarApp /><SeccionInstalacion /></>)
+  it('sin aviso del navegador el botón superior existe y lleva a la guía del pie', async () => {
+    const user = userEvent.setup()
+    const desplazar = vi.fn()
+    montar()
+    apartado().scrollIntoView = desplazar
+    expect(apartado()).toHaveAttribute('id', 'instalar-app')
     expect(screen.queryByRole('button', { name: 'Instalar aplicación' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('todavía no ofrece la instalación automática')
+    await user.click(superior())
+    expect(apartado()).toHaveFocus()
+    expect(desplazar).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
   })
 
-  it('con beforeinstallprompt muestra el botón, abre el diálogo y tras rechazarlo vuelve a las instrucciones', async () => {
+  it('con beforeinstallprompt el botón superior abre el diálogo y, si se rechaza, vuelve a llevar a la guía', async () => {
     const user = userEvent.setup()
-    render(<><InstalarApp /><SeccionInstalacion /></>)
+    montar()
     const { prompt, evento } = ofrecer('dismissed')
     expect(evento.defaultPrevented).toBe(true)
-    expect(screen.getAllByRole('button', { name: 'Instalar aplicación' })).toHaveLength(2)
-    await user.click(screen.getAllByRole('button', { name: 'Instalar aplicación' })[0])
+    await user.click(superior())
     expect(prompt).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('button', { name: 'Instalar aplicación' })).not.toBeInTheDocument()
+    expect(apartado()).not.toHaveFocus()
     expect(screen.getByRole('status')).toHaveTextContent('todavía no ofrece')
+    await user.click(superior())
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(apartado()).toHaveFocus()
   })
 
-  it('conserva el aviso recibido antes de montar y al aceptar indica que ya está instalada', async () => {
+  it('conserva el aviso recibido antes de montar; ya instalada, el botón superior sigue y muestra el estado', async () => {
     const user = userEvent.setup()
-    ofrecer('accepted')
-    render(<SeccionInstalacion />)
-    const seccion = screen.getByRole('region', { name: /en tu dispositivo/i })
-    await user.click(within(seccion).getByRole('button', { name: 'Instalar aplicación' }))
+    const { prompt } = ofrecer('accepted')
+    montar()
+    await user.click(within(apartado()).getByRole('button', { name: 'Instalar aplicación' }))
     expect(screen.getByRole('status')).toHaveTextContent('ya está instalada')
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Instalar aplicación' })).not.toBeInTheDocument()
+    await user.click(superior())
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(apartado()).toHaveFocus()
   })
 })

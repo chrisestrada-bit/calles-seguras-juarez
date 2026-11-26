@@ -4,13 +4,29 @@
    ========================================================================== */
 
 /* ——— Instalar aplicación ——— */
-.install-button { white-space: nowrap; min-height: 2.5rem; }
-/* Tableta y móvil: la cabecera envuelve; en teléfono el botón ocupa su propia fila completa, sin desbordes */
+/* La marca y «Instalar app» forman un solo bloque: nunca se separan ni se empalman con la navegación */
+.site-header__marca { display: flex; align-items: center; gap: var(--s-3); margin-right: auto; min-width: 0; }
+.site-header__marca .brand { margin-right: 0; }
+.install-button { flex: none; white-space: nowrap; min-height: 2.5rem; }
+/* Teléfono: primera fila para marca e instalación; avisos, tema y menú en la segunda */
 @media (max-width: 39.99em) {
-  .install-button { order: 1; flex: 1 0 100%; min-height: 2.75rem; }
-  .site-header__menu { order: 2; }
+  .site-header__marca { flex: 1 0 100%; justify-content: space-between; gap: var(--s-2); }
+  .site-header__inner > .bell { margin-left: auto; }
+  .site-header__inner > .theme-toggle:nth-child(2) { margin-left: auto; }
+  .menu-toggle, .site-header--sesion .menu-toggle { width: auto; padding: 0 var(--s-3); }
+  .menu-toggle span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
 }
-.instalacion { display: grid; justify-items: start; gap: var(--s-2); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+/* Teléfono angosto: marca y botón más compactos para caber en 360 px */
+@media (max-width: 25em) {
+  .site-header .site-header__inner { padding-inline: var(--s-3); }
+  .site-header .brand { gap: 0.375rem; }
+  .site-header .brand__mark { width: 2rem; height: 2rem; }
+  .site-header .brand__text { font-size: 0.875rem; }
+  .install-button { padding-inline: 0.6rem; }
+  .install-button .icon { display: none; }
+}
+.instalacion { display: grid; justify-items: start; gap: var(--s-2); padding-top: var(--s-4); border-top: 1px solid var(--border); border-radius: var(--r-sm); }
+.instalacion:focus { outline: 3px solid var(--route-600); outline-offset: 6px; }
 .instalacion__titulo { font-size: var(--text-md); color: var(--ink); }
 .instalacion p { max-width: 62ch; }
 .instalacion__lista { display: flex; align-items: center; gap: var(--s-2); color: var(--success-700); font-weight: 650; }
@@ -39,12 +55,12 @@
   .site-header:not(.site-header--sesion) .session-actions .button { min-height: 2.5rem; padding-inline: var(--s-4); font-size: var(--text-sm); white-space: nowrap; }
 
   /* ——— Cabecera con sesión: marca a la izquierda; acciones y navegación en un bloque alineado a la derecha ——— */
-  .site-header--sesion .site-header__inner { display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(4, auto); gap: var(--s-2) var(--s-3); }
-  .site-header--sesion .brand { grid-column: 1; grid-row: 1 / span 2; }
+  .site-header--sesion .site-header__inner { display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(3, auto); gap: var(--s-2) var(--s-3); }
+  .site-header--sesion .site-header__marca { grid-column: 1; grid-row: 1 / span 2; }
   .site-header--sesion .session-actions { grid-column: 3; grid-row: 1; justify-self: end; }
-  .site-header--sesion .install-button { grid-column: 4; grid-row: 1; }
-  .site-header--sesion .bell { grid-column: 5; grid-row: 1; }
-  .site-header--sesion .theme-toggle { grid-column: 6; grid-row: 1; }
+  .site-header--sesion .bell { grid-column: 4; grid-row: 1; }
+  .site-header--sesion .theme-toggle { grid-column: 5; grid-row: 1; }
+  .site-header--sesion .nav-list a { padding-inline: var(--s-3); }
   .site-header--sesion .site-header__menu nav { grid-column: 2 / -1; grid-row: 2; justify-self: end; }
 
   /* ——— Acciones junto a lo que afectan, no en la esquina opuesta ——— */
