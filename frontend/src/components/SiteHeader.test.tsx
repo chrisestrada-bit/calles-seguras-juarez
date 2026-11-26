@@ -10,9 +10,9 @@ const visitante: AuthContextValue = {
 const enlace: AuthContextValue = { ...visitante, autenticado: true, rolActivo: 'enlace_municipal', usuario: { id: '1', nombre: 'Persona Enlace', rol: 'enlace_municipal' } as AuthContextValue['usuario'] }
 
 describe('<SiteHeader /> (HU-08.4)', () => {
-  it.each([['visitante', visitante], ['con sesión', enlace]])('%s: «Instalar app» aparece junto a la marca sin esperar al navegador', (_, sesion) => {
+  it.each([['visitante', visitante], ['con sesión', enlace]])('%s: el botón de instalación aparece junto a la marca sin esperar al navegador', (_, sesion) => {
     render(<AuthContext.Provider value={sesion}><SiteHeader /></AuthContext.Provider>)
     const marca = screen.getByRole('link', { name: 'Calles Seguras Juárez, inicio' }).parentElement as HTMLElement
-    expect(within(marca).getByRole('button', { name: 'Instalar app' })).toBeInTheDocument()
+    expect(within(marca).getByRole('button', { name: 'Cómo instalar la app' })).toBeInTheDocument()
   })
 })

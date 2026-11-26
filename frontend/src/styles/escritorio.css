@@ -8,27 +8,36 @@
 .site-header__marca { display: flex; align-items: center; gap: var(--s-3); margin-right: auto; min-width: 0; }
 .site-header__marca .brand { margin-right: 0; }
 .install-button { flex: none; white-space: nowrap; min-height: 2.5rem; }
-/* Teléfono: primera fila para marca e instalación; avisos, tema y menú en la segunda */
+/* Teléfono: marca, avisos, tema y menú en la primera fila; la instalación ocupa la segunda a lo ancho */
 @media (max-width: 39.99em) {
-  .site-header__marca { flex: 1 0 100%; justify-content: space-between; gap: var(--s-2); }
-  .site-header__inner > .bell { margin-left: auto; }
-  .site-header__inner > .theme-toggle:nth-child(2) { margin-left: auto; }
-  .menu-toggle, .site-header--sesion .menu-toggle { width: auto; padding: 0 var(--s-3); }
-  .menu-toggle span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .site-header__marca { display: contents; }
+  .site-header .site-header__inner { column-gap: var(--s-2); }
+  .site-header__marca .brand { margin-right: auto; }
+  .site-header__inner > :is(.bell, .theme-toggle) { order: 1; }
+  .site-header__inner > .menu-toggle { order: 2; }
+  .site-header__marca .install-button { order: 3; flex: 1 0 100%; }
+  .site-header__inner > .site-header__menu { order: 4; }
 }
-/* Teléfono angosto: marca y botón más compactos para caber en 360 px */
+/* Teléfono angosto: marca compacta para caber en 360 px */
 @media (max-width: 25em) {
   .site-header .site-header__inner { padding-inline: var(--s-3); }
   .site-header .brand { gap: 0.375rem; }
   .site-header .brand__mark { width: 2rem; height: 2rem; }
   .site-header .brand__text { font-size: 0.875rem; }
-  .install-button { padding-inline: 0.6rem; }
-  .install-button .icon { display: none; }
+}
+/* En una sola fila: «Cómo instalar» a la vista; el resto del nombre queda para lectores de pantalla */
+@media (min-width: 40em) {
+  .install-button__resto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 }
 .instalacion { display: grid; justify-items: start; gap: var(--s-2); padding-top: var(--s-4); border-top: 1px solid var(--border); border-radius: var(--r-sm); }
 .instalacion:focus { outline: 3px solid var(--route-600); outline-offset: 6px; }
 .instalacion__titulo { font-size: var(--text-md); color: var(--ink); }
 .instalacion p { max-width: 62ch; }
+.instalacion .button { max-width: 100%; white-space: normal; }
+.instalacion__guia { display: grid; gap: var(--s-2); max-width: 62ch; }
+.instalacion__guia[hidden] { display: none; }
+.instalacion__guia h3 { font-size: var(--text-md); }
+.instalacion__guia ol { display: grid; gap: var(--s-1); margin: 0; padding-left: var(--s-5); }
 .instalacion__lista { display: flex; align-items: center; gap: var(--s-2); color: var(--success-700); font-weight: 650; }
 
 /* La cabecera, el clima y la barra de gestión comparten el margen lateral del contenido */
