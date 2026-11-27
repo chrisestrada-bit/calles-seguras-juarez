@@ -1,5 +1,7 @@
 # Calles Seguras Juárez
 
+[![CI](https://github.com/chrisestrada-bit/calles-seguras-juarez/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisestrada-bit/calles-seguras-juarez/actions/workflows/ci.yml)
+
 Plataforma web ciudadana de la Asociación Civil «Calles Seguras Juárez» (Ciudad Juárez, Chihuahua) para **reportar baches,
 alcantarillas sin tapa y encharcamientos**, dar seguimiento a las reparaciones y **consultar calles con riesgo de
 inundación** antes de circular.
@@ -10,6 +12,25 @@ inundación** antes de circular.
 | `backend/` | Python + FastAPI, Pydantic v2, SQLAlchemy 2.0, arquitectura en capas (`routers/`, `services/`, `models/`, `schemas/`) |
 | `db/` | PostgreSQL + migraciones Alembic (`db/migrations/`) + datos semilla idempotentes (`db/seed.py`) |
 | `infra/` | Dockerfiles, `docker-compose.yml` y manifiestos de Kubernetes (`infra/k8s/`) |
+
+## Despliegue público
+
+| Pieza | Proveedor | URL |
+|------|-----------|-----|
+| Frontend | Vercel | <https://calles-seguras-juarez.vercel.app> |
+| API | Render (desde `backend/Dockerfile`) | <https://calles-seguras-juarez-api.onrender.com> (prefijo `/api/v1`, disponibilidad en `/salud`) |
+| Base de datos | Neon (PostgreSQL administrado) | No se publica |
+
+El plan gratuito de Render suspende la API tras 15 minutos sin uso; la primera petición puede tardar cerca de un minuto.
+
+## Equipo
+
+Proyecto final de Programación Web (AEB-1055), Tecnológico Nacional de México — Instituto Tecnológico de Ciudad Juárez.
+
+| Integrante | Número de control | GitHub | Rol |
+|------------|-------------------|--------|-----|
+| Chris Aaron Dionisio Estrada | 23111598 | [`chrisestrada-bit`](https://github.com/chrisestrada-bit) | Codificación e integración: implementación y corrección de cambios con Claude Code; co-propuesta de soluciones |
+| Christian Daniel Salazar Mendoza | 23111502 | [`Khrixgm`](https://github.com/Khrixgm) | Calidad y validación: revisión de errores, pruebas, validación de funcionamiento y fusión de pull requests; co-propuesta de soluciones |
 
 ## Estado actual: `v1.1.1`
 

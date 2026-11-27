@@ -1,17 +1,109 @@
 # Uso de asistentes de IA
 
-Este documento declara cómo se usó IA en el proyecto, qué produjo y cómo se verificó. Los criterios de producto, las reglas de
-negocio (`RN-01` a `RN-10`) y la decisión de aceptar cada cambio fueron de las personas del equipo.
+Este documento declara cómo se usó IA en el proyecto, quién la usó, qué produjo y cómo se verificó. Sigue los siete puntos
+obligatorios de la especificación del curso y la política de autoría de la ACM. La IA no es autora: los dos integrantes
+responden por la exactitud de todo el material, incluido el generado por las herramientas. Los criterios de producto, las reglas
+de negocio (`RN-01` a `RN-10`) y la decisión de aceptar cada cambio fueron del equipo.
 
-## Herramientas
+## Equipo y forma de colaborar
 
-| Herramienta | Uso |
-|-------------|-----|
-| **Claude Code** (modelos Claude Sonnet 5.5 y Opus 5.5 de Anthropic) | Diseño e implementación incremental, pruebas, documentación y revisión |
-| **graphify** | Grafo de dependencias del repositorio para consultarlo sin releer archivos; se actualizó al inicio o al cierre de cada fase |
-| **Impeccable** (revisión de diseño) | Revisión automática de las hojas de estilo y componentes nuevos para mantener la identidad visual |
+| Integrante | Número de control | GitHub | Contribución acordada | Responsabilidad |
+|---|---|---|---|---|
+| Chris Aaron Dionisio Estrada | 23111598 | `chrisestrada-bit` | 60 % | Codificación: implementó y corrigió los cambios en colaboración directa con Claude Code |
+| Christian Daniel Salazar Mendoza | 23111502 | `Khrixgm` | 40 % | Revisión de errores, pruebas y validación de funcionamiento; revisó y fusionó 15 de los 19 pull requests |
 
-Los commits asistidos llevan el pie `Co-Authored-By` de la herramienta, según `CLAUDE.md`.
+Ambos integrantes co-propusieron las soluciones. El flujo de cada cambio fue el siguiente:
+
+1. El equipo acordaba la solución.
+2. Chris la implementaba con Claude Code en una rama y abría el pull request.
+3. Christian revisaba el cambio, lo probaba y validaba el funcionamiento.
+4. Con la CI en verde, Christian fusionaba el pull request.
+
+## 1. Herramientas y modelos
+
+| Herramienta | Modelo o versión | Quién la usó | Para qué |
+|---|---|---|---|
+| **Claude Code** (Anthropic) | Claude Sonnet 5.5 y Claude Opus 5.5 | Chris Aaron Dionisio Estrada | Diseño e implementación incremental, pruebas, documentación, auditoría y revisión |
+| **GitHub Copilot** | `[CONFIRMAR: versión o modelo configurado en el editor]` | Christian Daniel Salazar Mendoza | Estructura base del frontend, layout, autenticación, formulario de reportes y paneles (commits `493260f`, `41c9551` y `b55bc5a`, 2026-11-21) |
+| **graphify** | *Skill* de Claude Code | Chris Aaron Dionisio Estrada | Grafo de dependencias del repositorio (`graphify-out/`) para consultarlo sin releer archivos; se actualizó al inicio o al cierre de cada fase |
+| **Impeccable** | *Skill* de Claude Code | Chris Aaron Dionisio Estrada | Revisión de diseño de hojas de estilo y componentes nuevos |
+
+## 2. Harness y modo de uso
+
+* **Claude Code:** modo agente que edita archivos y ejecuta comandos (pruebas, migraciones, Git) desde la terminal (CLI) en
+  Windows, con permisos aprobados por el usuario. Se trabajó **una fase por vez**, con revisión humana y commit propio entre
+  fases.
+* **GitHub Copilot:** autocompletado y chat dentro del editor `[CONFIRMAR: IDE, p. ej. Visual Studio Code]`.
+
+## 3. Archivos de contexto e instrucciones
+
+| Archivo o recurso | Uso |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Stack obligatorio, reglas de negocio RN-01 a RN-10, seguridad, idioma y flujo de Git |
+| *Skills* de Claude Code | `graphify`, `impeccable`, `vercel-react-best-practices`, `vercel-composition-patterns` (citados en `CLAUDE.md` §5) |
+| Servidor MCP `chrome-devtools` | Revisión en navegador real, viewport de 360 px, Lighthouse y verificación de respuestas 403 |
+| `graphify-out/` | Grafo del repositorio que consultó el asistente antes de leer varios archivos |
+
+No se usaron `AGENTS.md`, `.github/copilot-instructions.md` ni reglas de Cursor.
+
+## 4. Bitácora de prompts significativos
+
+El prompt se resume con fidelidad a partir del mensaje del commit y de la sección por fases de este documento. Los prompts
+completos no se conservaron.
+
+| Fecha | Integrante | Herramienta / modelo | Prompt (resumen) | Archivos afectados | Ajustes humanos |
+|---|---|---|---|---|---|
+| 2026-11-21 | Chris | Claude Code / Opus | Definir modelo de datos, contrato de API y plantilla de variables a partir de `CLAUDE.md` | `docs/arquitectura.md`, `docs/api-contract.md`, `.env.example` | Revisión de reglas RN-01 a RN-10 y de la matriz de acceso |
+| 2026-11-21 | Christian | GitHub Copilot | Layout, autenticación, banner de lluvia, formulario de reportes y paneles de moderación | `frontend/src/` (`pages/`, `components/`, `context/`) | Se corrigió después la redirección en 401 del inicio de sesión (`ae9eefb`) |
+| 2026-11-21 | Chris | Claude Code / Sonnet | Implementar la API FastAPI por capas con migraciones Alembic, semilla y pruebas | `backend/app/`, `db/`, `backend/tests/` | Revisión de la máquina de estados y de los esquemas públicos sin datos personales |
+| 2026-11-22 | Chris | Claude Code / Sonnet | Contenedor del frontend, Compose completo y pipeline de CI | `frontend/Dockerfile`, `docker-compose.yml`, `.github/workflows/ci.yml` | Node 22 LTS en CI tras el fallo con Vitest 5 (`8e5e5ff`) |
+| 2026-11-22 | Chris | Claude Code / Sonnet y Opus | Requisitos opcionales, fases 1 a 4 (fotos, mapa, CSV/XML, WebSocket, PWA, cuadrillas, Kubernetes, Vitest y Playwright) | `backend/`, `frontend/`, `db/migrations/`, `infra/k8s/` | Tope de 5 MB, XML sin entidades externas, caché sin tokens, motivo de rechazo obligatorio (ver «Requisitos opcionales») |
+| 2026-11-22 | Chris | Claude Code / Opus | Auditoría de seguridad de sólo lectura y corrección de hallazgos | `backend/app/core/`, `backend/tests/`, `docs/auditoria-final/` | Quitar el valor por omisión de `SEED_PASSWORD`; documentar en lugar de forzar la configuración de Render |
+| 2026-11-23 | Chris | Claude Code / Opus 5.5 | Rechazar imágenes anómalas y cubrir archivos disfrazados, políglotas, bombas y *path traversal* | `backend/app/services/imagenes.py`, `backend/tests/test_seguridad_fotos.py` | Revisión de los límites `MAX_LADO_PX` y `MAX_PIXELES` |
+| 2026-11-25 | Chris | Claude Code / Opus | Identidad visual con dos temas y portada editorial | `frontend/src/styles/`, `frontend/src/components/` | Paleta y tipografía elegidas por el equipo; íconos y texto además del color |
+| 2026-11-25 | Chris | Claude Code / Sonnet 5.5 | Botón «Instalar app» e instalación guiada por navegador | `frontend/src/hooks/useInstalacion.ts`, `InstalarApp.tsx`, `escritorio.css` | El botón se muestra siempre; si no hay aviso nativo, abre la guía |
+| 2026-11-26 | Chris | Claude Code / Opus 5.5 | Generar el borrador del reporte técnico y la autoevaluación a partir de la especificación y el repositorio | `docs/REPORTE_BORRADOR.md`, `docs/AUTOEVALUACION.md`, `docs/REPORTE.docx`, `docs/REPORTE.pdf`, este archivo | El equipo confirmó integrantes, números de control y porcentajes de contribución, y revisa los párrafos de autoevaluación |
+
+La validación de cada fila la hizo Christian Daniel Salazar Mendoza antes de fusionar el pull request correspondiente.
+
+## 5. Marcado en commits
+
+Los commits asistidos llevan una línea final `Assisted-by: <herramienta/modelo>` o `Co-Authored-By: <modelo>`. Según el
+historial del 2026-11-26, **29 de 37 commits sin merge** están marcados: 26 de Claude Code y 3 de GitHub Copilot. Cuatro de los de Claude Code llevan
+ambos pies. Hay 8 commits sin marca:
+
+* Sin IA: `2ee4a8e` (commit inicial), `1aa0ba7` (estructura del monorepo) y `3a98a35` (estructura base del frontend).
+* Asistidos con Claude Code sin el pie: `ce9b869` (PR #37, descrito en «PR #37 y #38») y `2e75cc0` (*cherry-pick* del
+  autocompletado, descrito en «Cierre v1.1.1»).
+* Por confirmar: `8d0bc32`, `55831dd` y `7263df5`. `[CONFIRMAR: si fueron asistidos, se declaran aquí como Claude Code.]`
+
+## 6. Estimación por carpeta
+
+Se midió la proporción de líneas agregadas en commits marcados frente al total de líneas agregadas en cada carpeta. Es una cota
+superior, porque un commit marcado también incluye ajustes humanos.
+
+| Carpeta | Líneas en commits marcados / totales | Código generado por IA (aprox.) |
+|---|---|---|
+| `frontend/` (sin `package-lock.json`) | 9 808 / 11 213 | ≈ 87 % |
+| `backend/` | 10 819 / 10 819 | ≈ 100 %, con revisión y ajustes humanos |
+| `db/` | 1 578 / 1 578 | ≈ 100 %, con revisión y ajustes humanos |
+| `infra/` | 545 / 545 | ≈ 100 %, con revisión y ajustes humanos |
+
+## 7. Reflexión crítica
+
+**Un error que introdujo la IA y cómo se detectó.** El código asistido dejó la contraseña de las cuentas semilla como valor por
+omisión en `docker-compose.yml` y `.env.example` (hallazgo A1). Además, la documentación que también generó la IA
+(`AUDITORIA_OBLIGATORIA.md`) afirmaba que el repositorio no tenía contraseñas. Ninguna prueba falló, porque el defecto no
+rompía ninguna funcionalidad. Se detectó en la auditoría final al contrastar lo que decía la documentación con lo que hacía el
+código. Se corrigió quitando el valor por omisión: si `SEED_PASSWORD` está vacía, las cuentas reciben una contraseña aleatoria.
+Como la cadena sigue en el historial de Git, debe rotarse en producción. Un segundo caso fue un `<form>` anidado en la vista
+de moderación: compilaba y pasaba pytest, pero lo detectaron las pruebas E2E de Playwright.
+
+**Qué aprendimos que no habríamos aprendido sin la IA.** La IA produce rápido mucho código coherente y documentación convincente.
+Eso nos obligó a separar dos funciones: quien pide el cambio no es quien lo valida. Aprendimos a tratar lo que la IA afirma
+sobre su propio código como una hipótesis que se comprueba con una prueba ejecutada. También aprendimos a leer y defender
+decisiones que no habríamos tomado solos, como el hash de relleno contra la enumeración de cuentas, los triggers que respaldan
+las reglas de negocio y el escape de fórmulas en CSV. Cada una tuvimos que entenderla para poder explicarla en la demo.
 
 ## Requisitos opcionales (Fases 1–4)
 
