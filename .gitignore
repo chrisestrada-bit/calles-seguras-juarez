@@ -238,3 +238,6 @@ uploads/
 
 # Kubernetes: el Secret real (con valores propios) nunca se versiona; sólo secret.example.yaml
 infra/k8s/secret.yaml
+
+# Understand Anything (grafo local)
+.ua/
